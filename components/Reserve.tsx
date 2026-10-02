@@ -1,0 +1,232 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowUpRight, CheckCircle, Phone } from "@phosphor-icons/react";
+import Heading from "@/components/Heading";
+import Reveal from "@/components/Reveal";
+import { VENUE } from "@/lib/data";
+import { useLanguage } from "@/lib/language";
+import {
+  validateReservation,
+  type ReservationErrors,
+  type ReservationInput,
+} from "@/lib/reservation";
+
+type Status = "idle" | "sending" | "sent" | "failed";
+
+const EMPTY: ReservationInput = { name: "", phone: "", date: "", time: "", guests: "2" };
+
+const INPUT =
+  "h-12 w-full rounded-full bg-abyss px-5 text-base text-foam ring-1 ring-inset ring-foam/20 transition-shadow duration-300 ease-drift placeholder:text-mist/70 focus:outline-none focus:ring-2 focus:ring-buoy aria-[invalid=true]:ring-buoy";
+
+interface FieldProps {
+  id: keyof ReservationInput;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}
+
+function Field({ id, label, error, children }: FieldProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="label text-foam">
+        {label}
+      </label>
+      {children}
+      {error && (
+        <p id={`${id}-error`} className="text-sm text-buoy">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function Reserve() {
+  const [values, setValues] = useState<ReservationInput>(EMPTY);
+  const [errors, setErrors] = useState<ReservationErrors>({});
+  const [status, setStatus] = useState<Status>("idle");
+  const { t } = useLanguage();
+  const copy = t.reserve;
+  // Validation returns codes; the sentence shown depends on the current language.
+  const message = (key: keyof ReservationInput) => {
+    const code = errors[key];
+    return code ? copy.errors[code] : undefined;
+  };
+
+  const update = (key: keyof ReservationInput, value: string) => {
+    setValues((current) => ({ ...current, [key]: value }));
+    if (errors[key]) setErrors((current) => ({ ...current, [key]: undefined }));
+  };
+
+  const fieldProps = (key: keyof ReservationInput) => ({
+    id: key,
+    name: key,
+    value: values[key],
+    "aria-invalid": Boolean(errors[key]),
+    "aria-describedby": errors[key] ? `${key}-error` : undefined,
+    className: INPUT,
+  });
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const found = validateReservation(values);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    setStatus("sending");
+    try {
+      const response = await fetch("/api/reserve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        if (result.errors) setErrors(result.errors);
+        setStatus(result.errors ? "idle" : "failed");
+        return;
+      }
+      setStatus("sent");
+    } catch {
+      setStatus("failed");
+    }
+  };
+
+  const reset = () => {
+    setValues(EMPTY);
+    setErrors({});
+    setStatus("idle");
+  };
+
+  return (
+    <section
+      id="reserve"
+      className="mx-auto grid w-full max-w-[1400px] scroll-mt-28 grid-cols-1 gap-10 px-4 py-20 md:px-10 md:py-48 lg:grid-cols-12 lg:gap-10"
+    >
+      <Reveal className="lg:col-span-6">
+        <h2 className="display text-[clamp(2.25rem,6vw,5.5rem)] leading-[1.04] text-foam">
+          <Heading parts={copy.title} />
+        </h2>
+        <p className="mt-6 max-w-[46ch] text-base leading-relaxed text-mist md:text-lg">
+          {copy.body}
+        </p>
+        <a
+          href={VENUE.phoneHref}
+          className="display mt-6 inline-flex min-h-11 items-center gap-3 text-3xl text-foam transition-colors duration-500 ease-drift hover:text-buoy"
+        >
+          <Phone size={22} weight="light" className="text-buoy" />
+          {VENUE.phone}
+        </a>
+      </Reveal>
+
+      <Reveal delay={0.1} className="rounded-[2rem] bg-foam/5 p-1.5 ring-1 ring-foam/10 lg:col-span-6">
+        <div className="relative overflow-hidden rounded-[calc(2rem-0.375rem)] bg-trench p-6 shadow-[inset_0_1px_1px_rgba(232,239,236,0.12)] md:p-10">
+          <AnimatePresence mode="wait" initial={false}>
+            {status === "sent" ? (
+              <motion.div
+                key="sent"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -24 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="flex min-h-[420px] flex-col items-start justify-center gap-5"
+                role="status"
+              >
+                <CheckCircle size={48} weight="light" className="text-buoy" />
+                <h3 className="display text-4xl italic text-foam">{copy.sentTitle}</h3>
+                <p className="max-w-[40ch] text-base leading-relaxed text-mist">
+                  {copy.sentBody(values.name.trim(), values.phone.trim(), values.guests, values.time)}
+                </p>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="label mt-2 rounded-full px-5 py-3.5 text-foam ring-1 ring-inset ring-foam/25 transition-colors duration-500 ease-drift hover:bg-foam hover:text-abyss active:scale-[0.98]"
+                >
+                  {copy.again}
+                </button>
+              </motion.div>
+            ) : (
+              <motion.form
+                key="form"
+                noValidate
+                onSubmit={handleSubmit}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -24 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2"
+              >
+                <Field id="name" label={copy.name} error={message("name")}>
+                  <input
+                    {...fieldProps("name")}
+                    type="text"
+                    autoComplete="name"
+                    placeholder={copy.namePlaceholder}
+                    onChange={(event) => update("name", event.target.value)}
+                  />
+                </Field>
+                <Field id="phone" label={copy.phone} error={message("phone")}>
+                  <input
+                    {...fieldProps("phone")}
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="+49 000 0000000"
+                    onChange={(event) => update("phone", event.target.value)}
+                  />
+                </Field>
+                <Field id="date" label={copy.date} error={message("date")}>
+                  <input
+                    {...fieldProps("date")}
+                    type="date"
+                    onChange={(event) => update("date", event.target.value)}
+                  />
+                </Field>
+                <Field id="time" label={copy.time} error={message("time")}>
+                  <input
+                    {...fieldProps("time")}
+                    type="time"
+                    onChange={(event) => update("time", event.target.value)}
+                  />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field id="guests" label={copy.guests} error={message("guests")}>
+                    <select
+                      {...fieldProps("guests")}
+                      onChange={(event) => update("guests", event.target.value)}
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => (
+                        <option key={count} value={count}>
+                          {copy.guestCount(count)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="mt-2 flex flex-col gap-4 sm:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={status === "sending"}
+                    className="group inline-flex items-center justify-between gap-3 self-start whitespace-nowrap label rounded-full bg-buoy py-2 pl-6 pr-2 text-abyss transition-colors duration-500 ease-drift hover:bg-foam active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {status === "sending" ? copy.sending : copy.submit}
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-abyss/15 transition-transform duration-500 ease-drift group-hover:-translate-y-px group-hover:translate-x-1 group-hover:scale-105">
+                      <ArrowUpRight size={16} weight="light" />
+                    </span>
+                  </button>
+                  {status === "failed" && (
+                    <p role="alert" className="text-sm text-buoy">
+                      {copy.failed} {VENUE.phone}.
+                    </p>
+                  )}
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
