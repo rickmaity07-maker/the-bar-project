@@ -27,14 +27,6 @@ export const VENUE = {
   phone: "0176 70220501",
   phoneHref: "tel:+4917670220501",
   maps: "https://www.google.com/maps/search/?api=1&query=Kornmarkt+7%2C+97421+Schweinfurt",
-  /* Order matches t.visit.days. A null slot is a closed day. */
-  hours: [
-    { open: null, close: null },
-    { open: "18:00", close: "00:00" },
-    { open: "18:00", close: "03:00" },
-  ],
-  /* Date.getDay() values of the closed days: Monday and Tuesday. */
-  closedDays: [1, 2],
 } as const;
 
 const drink = (id: string) => unsplash(`photo-${id}`, 480);

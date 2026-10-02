@@ -4,8 +4,10 @@ import Image from "next/image";
 import { ArrowUpRight, MapPin } from "@phosphor-icons/react";
 import Heading from "@/components/Heading";
 import Reveal from "@/components/Reveal";
+import { useSiteData } from "@/components/SiteData";
 import { PHOTOS, VENUE } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
+import { groupHours } from "@/lib/site";
 
 /*
   Five cells on a 12-column grid, no gaps:
@@ -19,6 +21,7 @@ const CORE =
 
 export default function Bento() {
   const { t } = useLanguage();
+  const { week } = useSiteData();
 
   return (
     <section id="visit" className="mx-auto w-full max-w-[1400px] scroll-mt-28 px-4 py-20 md:px-10 md:py-48">
@@ -54,11 +57,11 @@ export default function Bento() {
           <div className={`${CORE} flex flex-col justify-between gap-8 bg-buoy p-7 text-abyss md:p-9`}>
             <h3 className="display text-3xl italic">{t.visit.hoursTitle}</h3>
             <dl className="space-y-2">
-              {VENUE.hours.map((slot, index) => (
+              {groupHours(week).map((slot, index) => (
                 <div key={index} className="flex flex-col gap-x-4 gap-y-1 md:flex-row md:items-baseline md:justify-between">
-                  <dt className="label">{t.visit.days[index]}</dt>
+                  <dt className="label">{slot.days.map((day) => t.visit.weekdays[day]).join(", ")}</dt>
                   <dd className="display whitespace-nowrap text-2xl">
-                    {slot.open ? `${slot.open} ${t.visit.until} ${slot.close}` : t.visit.closed}
+                    {slot.closed ? t.visit.closed : `${slot.open} ${t.visit.until} ${slot.close}`}
                   </dd>
                 </div>
               ))}

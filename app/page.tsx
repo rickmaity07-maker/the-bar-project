@@ -10,11 +10,19 @@ import NightStack from "@/components/NightStack";
 import OceanCanvas from "@/components/OceanCanvas";
 import PourAccordion from "@/components/PourAccordion";
 import Reserve from "@/components/Reserve";
+import { SiteDataProvider } from "@/components/SiteData";
 import SmoothScroll from "@/components/SmoothScroll";
+import { getSiteData } from "@/lib/site-data";
 
-export default function Home() {
+/*
+  Prerendered. The menu and opening hours come from the database, and the admin
+  portal revalidates this page whenever the owner changes them.
+*/
+export default async function Home() {
+  const siteData = await getSiteData();
+
   return (
-    <>
+    <SiteDataProvider value={siteData}>
       <SmoothScroll />
       <OceanCanvas />
       <div
@@ -37,6 +45,6 @@ export default function Home() {
       </main>
 
       <Footer />
-    </>
+    </SiteDataProvider>
   );
 }

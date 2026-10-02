@@ -11,7 +11,7 @@ import {
 } from "motion/react";
 import Heading from "@/components/Heading";
 import Reveal from "@/components/Reveal";
-import { POURS } from "@/lib/data";
+import { useSiteData } from "@/components/SiteData";
 import { useLanguage } from "@/lib/language";
 
 /*
@@ -26,15 +26,17 @@ export default function PourAccordion() {
   // True while the cursor is on a drink's name, where the viewer stays out of the way.
   const [overName, setOverName] = useState(false);
   const reduce = useReducedMotion();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { menu } = useSiteData();
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const springX = useSpring(x, { stiffness: 140, damping: 18, mass: 0.5 });
   const springY = useSpring(y, { stiffness: 140, damping: 18, mass: 0.5 });
 
-  const category = t.menu.categories[active];
-  const drinks = POURS[active];
+  // The owner can remove categories in the portal, so the open tab may no longer exist.
+  const category = menu[active] ?? menu[0];
+  const drinks = category.items;
 
   const track = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "mouse") return;
@@ -54,11 +56,11 @@ export default function PourAccordion() {
 
       <Reveal className="mt-12 md:mt-16">
         <div role="tablist" aria-label={t.menu.sections} className="flex flex-wrap gap-2">
-          {t.menu.categories.map((item, index) => {
+          {menu.map((item, index) => {
             const selected = index === active;
             return (
               <button
-                key={index}
+                key={item.id}
                 type="button"
                 role="tab"
                 id={`pour-tab-${index}`}
@@ -80,7 +82,7 @@ export default function PourAccordion() {
                     transition={{ type: "spring", stiffness: 260, damping: 26 }}
                   />
                 )}
-                <span className="relative">{item.name}</span>
+                <span className="relative">{item.name[locale]}</span>
               </button>
             );
           })}
@@ -106,12 +108,12 @@ export default function PourAccordion() {
               transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
             >
               <p className="max-w-[52ch] text-base leading-relaxed text-mist md:text-lg">
-                {category.line} {t.menu.priceNote}
+                {category.line[locale]} {t.menu.priceNote}
               </p>
               <ul className="group/list mt-8">
-                {category.items.map((item, index) => (
+                {drinks.map((item, index) => (
                   <motion.li
-                    key={index}
+                    key={item.id}
                     initial={reduce ? false : { opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
@@ -123,7 +125,7 @@ export default function PourAccordion() {
                       className="group/row flex items-baseline justify-between gap-3 py-2.5 md:gap-6 transition-opacity duration-500 ease-drift group-hover/list:opacity-35 hover:!opacity-100 md:py-3"
                     >
                       <span className="relative mr-1 h-12 w-12 shrink-0 self-center overflow-hidden rounded-full ring-1 ring-foam/20 md:hidden">
-                        <Image src={drinks[index].image} alt="" fill sizes="48px" className="object-cover" />
+                        <Image src={item.image} alt="" fill sizes="48px" className="object-cover" />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col md:flex-row md:items-baseline">
                         {/*
@@ -137,15 +139,17 @@ export default function PourAccordion() {
                           className="-my-2 py-2 md:-my-3 md:py-3 md:pr-10"
                         >
                           <span className="display block text-[clamp(1.9rem,5.4vw,5rem)] leading-[1.12] text-foam transition-transform duration-700 ease-drift group-hover/row:translate-x-4 group-hover/row:italic">
-                            {item.name}
+                            {item.name[locale]}
                           </span>
                         </span>
-                        {item.note && (
-                          <span className="text-sm text-mist md:max-w-[46ch] md:text-base">{item.note}</span>
+                        {item.note[locale] && (
+                          <span className="text-sm text-mist md:max-w-[46ch] md:text-base">
+                            {item.note[locale]}
+                          </span>
                         )}
                       </span>
                       <span className="display whitespace-nowrap text-2xl italic text-buoy md:text-4xl">
-                        {drinks[index].price}
+                        {item.price}
                       </span>
                     </div>
                   </motion.li>
@@ -175,7 +179,7 @@ export default function PourAccordion() {
             {/* Every photo of the open category stays mounted so switching rows is an instant crossfade. */}
             {drinks.map((drink, index) => (
               <Image
-                key={index}
+                key={drink.id}
                 src={drink.image}
                 alt=""
                 fill

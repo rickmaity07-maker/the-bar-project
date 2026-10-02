@@ -1,10 +1,13 @@
 "use client";
 
+import { useSiteData } from "@/components/SiteData";
 import { NAV_TARGETS, VENUE } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
+import { groupHours } from "@/lib/site";
 
 export default function Footer() {
   const { t } = useLanguage();
+  const { week } = useSiteData();
 
   return (
     <footer className="relative z-10 overflow-hidden px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-10 md:px-10 md:pt-16">
@@ -20,10 +23,10 @@ export default function Footer() {
         <div>
           <h2 className="label text-foam">{t.footer.hours}</h2>
           <ul className="mt-2 text-base text-foam/85 md:mt-4 md:space-y-1">
-            {VENUE.hours.map((slot, index) => (
+            {groupHours(week).map((slot, index) => (
               <li key={index}>
-                {t.visit.days[index]}:{" "}
-                {slot.open ? `${slot.open} ${t.visit.until} ${slot.close}` : t.visit.closed}
+                {slot.days.map((day) => t.visit.weekdays[day]).join(", ")}:{" "}
+                {slot.closed ? t.visit.closed : `${slot.open} ${t.visit.until} ${slot.close}`}
               </li>
             ))}
           </ul>

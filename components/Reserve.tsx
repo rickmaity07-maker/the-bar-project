@@ -5,23 +5,40 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, CheckCircle, Phone } from "@phosphor-icons/react";
 import Heading from "@/components/Heading";
 import Reveal from "@/components/Reveal";
+import { useSiteData } from "@/components/SiteData";
 import { VENUE } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import {
+  MAX_MESSAGE_LENGTH,
+  MAX_PRIVATE_GUESTS,
+  MAX_TABLE_GUESTS,
+  OCCASIONS,
   validateReservation,
   type ReservationErrors,
+  type ReservationField,
   type ReservationInput,
 } from "@/lib/reservation";
 
 type Status = "idle" | "sending" | "sent" | "failed";
 
-const EMPTY: ReservationInput = { name: "", phone: "", date: "", time: "", guests: "2" };
+const EMPTY: ReservationInput = {
+  name: "",
+  phone: "",
+  date: "",
+  time: "",
+  guests: "2",
+  isPrivate: false,
+  occasion: "",
+  endTime: "",
+  email: "",
+  message: "",
+};
 
 const INPUT =
   "h-12 w-full rounded-full bg-abyss px-5 text-base text-foam ring-1 ring-inset ring-foam/20 transition-shadow duration-300 ease-drift placeholder:text-mist/70 focus:outline-none focus:ring-2 focus:ring-buoy aria-[invalid=true]:ring-buoy";
 
 interface FieldProps {
-  id: keyof ReservationInput;
+  id: ReservationField;
   label: string;
   error?: string;
   children: React.ReactNode;
@@ -47,20 +64,27 @@ export default function Reserve() {
   const [values, setValues] = useState<ReservationInput>(EMPTY);
   const [errors, setErrors] = useState<ReservationErrors>({});
   const [status, setStatus] = useState<Status>("idle");
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const schedule = useSiteData();
   const copy = t.reserve;
   // Validation returns codes; the sentence shown depends on the current language.
-  const message = (key: keyof ReservationInput) => {
+  const message = (key: ReservationField) => {
     const code = errors[key];
     return code ? copy.errors[code] : undefined;
   };
 
-  const update = (key: keyof ReservationInput, value: string) => {
+  const update = (key: ReservationField, value: string) => {
     setValues((current) => ({ ...current, [key]: value }));
     if (errors[key]) setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
-  const fieldProps = (key: keyof ReservationInput) => ({
+  // A whole-bar booking has no fixed table size, so the guest count starts empty.
+  const togglePrivate = (isPrivate: boolean) => {
+    setValues((current) => ({ ...current, isPrivate, guests: isPrivate ? "" : "2" }));
+    setErrors({});
+  };
+
+  const fieldProps = (key: ReservationField) => ({
     id: key,
     name: key,
     value: values[key],
@@ -71,7 +95,7 @@ export default function Reserve() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const found = validateReservation(values);
+    const found = validateReservation(values, schedule);
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
@@ -80,7 +104,7 @@ export default function Reserve() {
       const response = await fetch("/api/reserve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, locale }),
       });
       const result = await response.json();
       if (!response.ok || !result.ok) {
@@ -137,7 +161,9 @@ export default function Reserve() {
                 <CheckCircle size={48} weight="light" className="text-buoy" />
                 <h3 className="display text-4xl italic text-foam">{copy.sentTitle}</h3>
                 <p className="max-w-[40ch] text-base leading-relaxed text-mist">
-                  {copy.sentBody(values.name.trim(), values.phone.trim(), values.guests, values.time)}
+                  {values.isPrivate
+                    ? copy.sentBodyPrivate(values.name.trim(), values.phone.trim())
+                    : copy.sentBody(values.name.trim(), values.phone.trim(), values.guests, values.time)}
                 </p>
                 <button
                   type="button"
@@ -158,6 +184,20 @@ export default function Reserve() {
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 className="grid grid-cols-1 gap-5 sm:grid-cols-2"
               >
+                <label className="flex cursor-pointer items-start gap-3 rounded-3xl bg-abyss p-4 ring-1 ring-inset ring-foam/20 has-[:checked]:ring-2 has-[:checked]:ring-buoy sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    name="isPrivate"
+                    checked={values.isPrivate}
+                    onChange={(event) => togglePrivate(event.target.checked)}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-buoy"
+                  />
+                  <span>
+                    <span className="block text-base text-foam">{copy.privateLabel}</span>
+                    <span className="mt-1 block text-sm text-mist">{copy.privateHint}</span>
+                  </span>
+                </label>
+
                 <Field id="name" label={copy.name} error={message("name")}>
                   <input
                     {...fieldProps("name")}
@@ -190,20 +230,76 @@ export default function Reserve() {
                     onChange={(event) => update("time", event.target.value)}
                   />
                 </Field>
-                <div className="sm:col-span-2">
-                  <Field id="guests" label={copy.guests} error={message("guests")}>
-                    <select
-                      {...fieldProps("guests")}
-                      onChange={(event) => update("guests", event.target.value)}
-                    >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => (
-                        <option key={count} value={count}>
-                          {copy.guestCount(count)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
+                {values.isPrivate ? (
+                  <>
+                    <Field id="endTime" label={copy.endTime} error={message("endTime")}>
+                      <input
+                        {...fieldProps("endTime")}
+                        type="time"
+                        onChange={(event) => update("endTime", event.target.value)}
+                      />
+                    </Field>
+                    <Field id="guests" label={copy.expectedGuests} error={message("guests")}>
+                      <input
+                        {...fieldProps("guests")}
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={MAX_PRIVATE_GUESTS}
+                        onChange={(event) => update("guests", event.target.value)}
+                      />
+                    </Field>
+                    <Field id="occasion" label={copy.occasion} error={message("occasion")}>
+                      <select
+                        {...fieldProps("occasion")}
+                        onChange={(event) => update("occasion", event.target.value)}
+                      >
+                        <option value="">{copy.occasionPlaceholder}</option>
+                        {OCCASIONS.map((occasion) => (
+                          <option key={occasion} value={occasion}>
+                            {copy.occasions[occasion]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field id="email" label={copy.email} error={message("email")}>
+                      <input
+                        {...fieldProps("email")}
+                        type="email"
+                        autoComplete="email"
+                        placeholder={copy.emailPlaceholder}
+                        onChange={(event) => update("email", event.target.value)}
+                      />
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Field id="message" label={copy.message} error={message("message")}>
+                        <textarea
+                          {...fieldProps("message")}
+                          rows={4}
+                          maxLength={MAX_MESSAGE_LENGTH}
+                          placeholder={copy.messagePlaceholder}
+                          onChange={(event) => update("message", event.target.value)}
+                          className={`${INPUT} h-auto resize-y rounded-3xl py-3`}
+                        />
+                      </Field>
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2">
+                    <Field id="guests" label={copy.guests} error={message("guests")}>
+                      <select
+                        {...fieldProps("guests")}
+                        onChange={(event) => update("guests", event.target.value)}
+                      >
+                        {Array.from({ length: MAX_TABLE_GUESTS }, (_, index) => index + 1).map((count) => (
+                          <option key={count} value={count}>
+                            {copy.guestCount(count)}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                )}
 
                 <div className="mt-2 flex flex-col gap-4 sm:col-span-2">
                   <button
@@ -211,7 +307,7 @@ export default function Reserve() {
                     disabled={status === "sending"}
                     className="group inline-flex items-center justify-between gap-3 self-start whitespace-nowrap label rounded-full bg-buoy py-2 pl-6 pr-2 text-abyss transition-colors duration-500 ease-drift hover:bg-foam active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
                   >
-                    {status === "sending" ? copy.sending : copy.submit}
+                    {status === "sending" ? copy.sending : values.isPrivate ? copy.submitPrivate : copy.submit}
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-abyss/15 transition-transform duration-500 ease-drift group-hover:-translate-y-px group-hover:translate-x-1 group-hover:scale-105">
                       <ArrowUpRight size={16} weight="light" />
                     </span>
