@@ -3,8 +3,8 @@
 import { useSyncExternalStore } from "react";
 import { content, DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 
-const STORAGE_KEY = "fathom-locale";
-const CHANGE_EVENT = "fathom-locale-change";
+const STORAGE_KEY = "bar05-locale";
+const CHANGE_EVENT = "bar05-locale-change";
 
 /* Used when storage is unavailable (private windows), so the switch still works for the visit. */
 let memory: Locale | null = null;

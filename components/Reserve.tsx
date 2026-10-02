@@ -172,7 +172,7 @@ export default function Reserve() {
                     {...fieldProps("phone")}
                     type="tel"
                     autoComplete="tel"
-                    placeholder="+49 000 0000000"
+                    placeholder={copy.phonePlaceholder}
                     onChange={(event) => update("phone", event.target.value)}
                   />
                 </Field>

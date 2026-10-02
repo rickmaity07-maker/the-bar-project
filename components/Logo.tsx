@@ -23,7 +23,7 @@ export default function Logo({ tagline }: { tagline: string }) {
         <circle cx="16" cy="16" r="11" stroke="currentColor" strokeWidth="1.5" />
       </svg>
       <span className="flex flex-col leading-none">
-        <span className="display wordmark text-[22px] tracking-[0.14em]">FATHOM</span>
+        <span className="display wordmark text-[22px] tracking-[0.14em]">BAR-05</span>
         <span className="mt-1.5 text-[8px] font-semibold uppercase tracking-[0.34em] text-foam/60">
           {tagline}
         </span>

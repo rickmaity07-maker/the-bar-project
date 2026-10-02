@@ -11,7 +11,7 @@ import { useLanguage } from "@/lib/language";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 /*
-  A day at the bar in three beats: 09:00, 00:00, 05:00. On desktop the stage
+  A day at the bar in three beats: 18:00, 00:00, 03:00. On desktop the stage
   pins and scroll turns the clock, each beat handing over to the next. On phones
   and under reduced motion the beats are simply stacked.
 */

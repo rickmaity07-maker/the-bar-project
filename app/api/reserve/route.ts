@@ -1,7 +1,7 @@
 import { validateReservation, type ReservationInput } from "@/lib/reservation";
 
 /*
-  Demo endpoint: validates the request and acknowledges it.
+  Not connected yet: validates the request and acknowledges it.
   Nothing is stored or emailed yet. Connect a database or mailer here.
 */
 export async function POST(request: Request) {

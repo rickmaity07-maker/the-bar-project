@@ -1,6 +1,5 @@
 "use client";
 
-import { InstagramLogo } from "@phosphor-icons/react";
 import { NAV_TARGETS, VENUE } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 
@@ -23,7 +22,8 @@ export default function Footer() {
           <ul className="mt-2 text-base text-foam/85 md:mt-4 md:space-y-1">
             {VENUE.hours.map((slot, index) => (
               <li key={index}>
-                {t.visit.days[index]}, {slot.open} {t.visit.until} {slot.close}
+                {t.visit.days[index]}:{" "}
+                {slot.open ? `${slot.open} ${t.visit.until} ${slot.close}` : t.visit.closed}
               </li>
             ))}
           </ul>
@@ -32,28 +32,10 @@ export default function Footer() {
         <div>
           <h2 className="label text-foam">{t.footer.contact}</h2>
           <ul className="mt-2 text-base text-foam/85 md:mt-4 md:space-y-1">
+            <li>{VENUE.contact}</li>
             <li>
               <a href={VENUE.phoneHref} className="inline-flex min-h-11 items-center transition-colors duration-500 ease-drift hover:text-foam md:min-h-0">
                 {VENUE.phone}
-              </a>
-            </li>
-            <li>
-              <a
-                href={`mailto:${VENUE.email}`}
-                className="inline-flex min-h-11 items-center break-all transition-colors duration-500 ease-drift hover:text-foam md:min-h-0"
-              >
-                {VENUE.email}
-              </a>
-            </li>
-            <li>
-              <a
-                href={VENUE.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center gap-2 transition-colors duration-500 ease-drift hover:text-foam md:min-h-0"
-              >
-                <InstagramLogo size={18} weight="light" />
-                Instagram
               </a>
             </li>
           </ul>
@@ -77,7 +59,7 @@ export default function Footer() {
         aria-hidden="true"
         className="display wordmark mx-auto mt-16 w-full max-w-[1400px] select-none text-center text-[21vw] leading-[0.85] text-foam/90 min-[1400px]:text-[294px]"
       >
-        FATHOM
+        BAR-05
       </p>
 
       <p className="mx-auto mt-8 w-full max-w-[1400px] text-sm text-mist">

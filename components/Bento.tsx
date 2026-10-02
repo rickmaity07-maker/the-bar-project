@@ -53,12 +53,12 @@ export default function Bento() {
         <Reveal delay={0.08} className={`md:col-span-5 ${SHELL}`}>
           <div className={`${CORE} flex flex-col justify-between gap-8 bg-buoy p-7 text-abyss md:p-9`}>
             <h3 className="display text-3xl italic">{t.visit.hoursTitle}</h3>
-            <dl className="space-y-4">
+            <dl className="space-y-2">
               {VENUE.hours.map((slot, index) => (
-                <div key={index} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div key={index} className="flex flex-col gap-x-4 gap-y-1 md:flex-row md:items-baseline md:justify-between">
                   <dt className="label">{t.visit.days[index]}</dt>
-                  <dd className="display text-3xl md:text-4xl">
-                    {slot.open} {t.visit.until} {slot.close}
+                  <dd className="display whitespace-nowrap text-2xl">
+                    {slot.open ? `${slot.open} ${t.visit.until} ${slot.close}` : t.visit.closed}
                   </dd>
                 </div>
               ))}
@@ -104,8 +104,15 @@ export default function Bento() {
           <div
             className={`${CORE} flex flex-col justify-end bg-[radial-gradient(120%_140%_at_100%_0%,var(--color-reef)_0%,var(--color-trench)_60%)] p-7 md:p-10`}
           >
-            <h3 className="display max-w-[18ch] text-3xl text-foam md:text-5xl">{t.visit.greekTitle}</h3>
-            <p className="mt-4 max-w-[52ch] text-base leading-relaxed text-mist">{t.visit.greekBody}</p>
+            <h3 className="display max-w-[18ch] text-3xl text-foam md:text-5xl">{t.visit.kukkiTitle}</h3>
+            <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-mist">{t.visit.kukkiBody}</p>
+            <ul className="mt-5 flex flex-wrap gap-2">
+              {t.visit.kukkiFacts.map((fact) => (
+                <li key={fact} className="label rounded-full px-4 py-2 text-foam ring-1 ring-inset ring-foam/25">
+                  {fact}
+                </li>
+              ))}
+            </ul>
           </div>
         </Reveal>
       </div>

@@ -19,9 +19,9 @@ const bodoni = Bodoni_Moda({
   axes: ["opsz"],
 });
 
-const title = "Fathom | Die Bar am Grund des Atlantiks";
+const title = "Bar-05 | Bar am Kornmarkt in Schweinfurt";
 const description =
-  "Tagsüber Café, nachts Cocktailbar. Griechischer Kaffee, Hauscocktails und lange Wochenenden, erzählt als Abstieg in den Atlantik.";
+  "Bar am Kornmarkt 7 in Schweinfurt. Kukki-Flaschencocktails, Roth Bier, Gespritzte und Shots. Mittwoch bis Sonntag ab 18 Uhr, freitags und samstags bis 3 Uhr.";
 
 // Vercel provides the production domain at build time; link previews need absolute URLs.
 const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title,
   description,
-  openGraph: { title, description, type: "website", locale: "de_DE", siteName: "Fathom" },
+  openGraph: { title, description, type: "website", locale: "de_DE", siteName: "Bar-05" },
   twitter: { card: "summary_large_image", title, description },
 };
 

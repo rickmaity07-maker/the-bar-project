@@ -1,3 +1,5 @@
+import { VENUE } from "@/lib/data";
+
 export interface ReservationInput {
   name: string;
   phone: string;
@@ -7,7 +9,14 @@ export interface ReservationInput {
 }
 
 /* Codes rather than sentences, so the form can show the message in the visitor's language. */
-export type ReservationErrorCode = "name" | "phone" | "date" | "datePast" | "time" | "guests";
+export type ReservationErrorCode =
+  | "name"
+  | "phone"
+  | "date"
+  | "datePast"
+  | "closed"
+  | "time"
+  | "guests";
 
 export type ReservationErrors = Partial<Record<keyof ReservationInput, ReservationErrorCode>>;
 
@@ -24,7 +33,9 @@ export function validateReservation(input: ReservationInput): ReservationErrors 
   } else {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (new Date(`${input.date}T00:00:00`) < today) errors.date = "datePast";
+    const day = new Date(`${input.date}T00:00:00`);
+    if (day < today) errors.date = "datePast";
+    else if ((VENUE.closedDays as readonly number[]).includes(day.getDay())) errors.date = "closed";
   }
 
   if (!/^\d{2}:\d{2}$/.test(input.time)) errors.time = "time";

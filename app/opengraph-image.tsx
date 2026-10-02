@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 /* Link preview shown when the site is shared in chats and on social networks. */
-export const alt = "Fathom, die Bar am Grund des Atlantiks";
+export const alt = "Bar-05, die Bar am Kornmarkt in Schweinfurt";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -36,7 +36,7 @@ export default function OpengraphImage() {
               lineHeight: 0.72,
             }}
           >
-            FATHOM
+            BAR-05
           </div>
         </div>
         <div
@@ -50,7 +50,7 @@ export default function OpengraphImage() {
             fontSize: 38,
           }}
         >
-          Die Bar am Grund des Atlantiks
+          Bar am Kornmarkt, Schweinfurt
         </div>
       </div>
     ),

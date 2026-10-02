@@ -83,7 +83,7 @@ export default function Hero() {
           style={{ clipPath: "inset(0 0 calc(100% - var(--waterline, 50vh)) 0)" }}
         >
           <div className="hero-sink">
-            <span className={`${WORD} text-foam`}>FATHOM</span>
+            <span className={`${WORD} text-foam`}>BAR-05</span>
           </div>
         </div>
         <div
@@ -92,7 +92,7 @@ export default function Hero() {
           style={{ clipPath: "inset(var(--waterline, 50vh) 0 0 0)" }}
         >
           <div className="hero-sink" style={{ filter: "url(#undertow)" }}>
-            <span className={`${WORD} text-[#8fd0c6]/75`}>FATHOM</span>
+            <span className={`${WORD} text-[#8fd0c6]/75`}>BAR-05</span>
           </div>
         </div>
 

@@ -140,15 +140,21 @@ export default function PourAccordion() {
                             {item.name}
                           </span>
                         </span>
-                        <span className="text-sm text-mist md:text-base">{item.note}</span>
+                        {item.note && (
+                          <span className="text-sm text-mist md:max-w-[46ch] md:text-base">{item.note}</span>
+                        )}
                       </span>
-                      <span className="display text-2xl italic text-buoy md:text-4xl">
+                      <span className="display whitespace-nowrap text-2xl italic text-buoy md:text-4xl">
                         {drinks[index].price}
                       </span>
                     </div>
                   </motion.li>
                 ))}
               </ul>
+              <p className="mt-10 max-w-[52ch] text-sm leading-relaxed text-mist md:text-base">
+                <span className="label mb-2 block text-foam">{t.menu.allergensTitle}</span>
+                {t.menu.allergens}
+              </p>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -169,7 +175,7 @@ export default function PourAccordion() {
             {/* Every photo of the open category stays mounted so switching rows is an instant crossfade. */}
             {drinks.map((drink, index) => (
               <Image
-                key={drink.image}
+                key={index}
                 src={drink.image}
                 alt=""
                 fill
