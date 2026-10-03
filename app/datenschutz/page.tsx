@@ -65,12 +65,13 @@ export default function PrivacyPage() {
           verarbeitet Vercel technisch notwendige Verbindungsdaten (IP-Adresse, Zeitpunkt, aufgerufene Adresse,
           Browserkennung), um die Seite auszuliefern und vor Angriffen zu schützen. Rechtsgrundlage ist unser
           berechtigtes Interesse an einem sicheren Betrieb (Art. 6 Abs. 1 lit. f DSGVO). Vercel speichert diese
-          Protokolle nur kurzzeitig. Seiten werden über Vercels Netz aus einem Rechenzentrum in eurer Nähe
-          (für Deutschland meist Frankfurt) ausgeliefert, die Programmlogik läuft in Washington D.C., USA.
+          Protokolle nur kurzzeitig. Die Seiten und die gesamte Programmlogik laufen in Vercels Rechenzentrum in
+          Frankfurt am Main.
         </p>
         <p>
           Mit Vercel besteht ein Auftragsverarbeitungsvertrag (Art. 28 DSGVO) einschließlich der
-          EU-Standardvertragsklauseln für die Übermittlung in die USA (Art. 46 Abs. 2 lit. c DSGVO).
+          EU-Standardvertragsklauseln (Art. 46 Abs. 2 lit. c DSGVO), weil Vercel ein US-Unternehmen ist und ein
+          Zugriff aus den USA, etwa für den Support, nicht ausgeschlossen werden kann.
         </p>
       </Section>
 
@@ -114,9 +115,9 @@ export default function PrivacyPage() {
         <p>
           Konten, Reservierungen, Speisekarte und das Änderungsprotokoll liegen in einer Postgres-Datenbank bei Neon
           (Databricks, Inc., 160 Spear Street, San Francisco, CA 94105, USA) in einem Rechenzentrum von Amazon Web
-          Services in Ohio, USA. Mit Neon besteht ein Auftragsverarbeitungsvertrag einschließlich der
-          EU-Standardvertragsklauseln (Art. 28, Art. 46 Abs. 2 lit. c DSGVO). Die Verbindung zur Datenbank ist
-          verschlüsselt.
+          Services in Frankfurt am Main. Die Daten verlassen die EU dafür nicht. Mit Neon besteht ein
+          Auftragsverarbeitungsvertrag einschließlich der EU-Standardvertragsklauseln für einen möglichen Zugriff
+          aus den USA (Art. 28, Art. 46 Abs. 2 lit. c DSGVO). Die Verbindung zur Datenbank ist verschlüsselt.
         </p>
         <p>
           Zugriff auf die Verwaltung haben nur Konten mit der Rolle „Inhaber“. Jede Änderung dort wird mit dem

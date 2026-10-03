@@ -104,7 +104,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     const href = await page.locator('footer a[href="/datenschutz"]').getAttribute("href");
     const res = await page.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
     const t = await page.locator("main").innerText();
-    const need = ["Verantwortlich", "Kornmarkt 7", "Vercel", "Google", "Gmail", "Neon", "Ohio", "Wie lange wir Daten speichern", "6 Monate", "bar05-locale", "§ 25 Abs. 2", "Eure Rechte", "Aufsichtsbehörde"];
+    const need = ["Verantwortlich", "Kornmarkt 7", "Vercel", "Google", "Gmail", "Neon", "Frankfurt am Main", "Wie lange wir Daten speichern", "6 Monate", "bar05-locale", "§ 25 Abs. 2", "Eure Rechte", "Aufsichtsbehörde"];
     const missing = need.filter((x) => !t.includes(x));
     return { ok: res?.status() === 200 && (await page.title()).startsWith("Datenschutz") && missing.length === 0, extra: missing.join(",") || "all sections" };
   });
