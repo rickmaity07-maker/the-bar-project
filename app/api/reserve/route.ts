@@ -1,8 +1,10 @@
+import { after } from "next/server";
 import { db, hasDatabase } from "@/lib/db";
+import { notifyNewReservation } from "@/lib/mailer";
 import { validateReservation, type ReservationInput } from "@/lib/reservation";
 import { getSiteData } from "@/lib/site-data";
 
-/* Validates a reservation request and stores it as "pending" for the admin portal. */
+/* Validates a reservation request, stores it as "pending" and emails the bar about it. */
 export async function POST(request: Request) {
   let body: Partial<Record<keyof ReservationInput | "locale", unknown>>;
   try {
@@ -50,6 +52,10 @@ export async function POST(request: Request) {
     console.error("Reservation could not be stored:", error);
     return Response.json({ ok: false, message: "Could not store the reservation." }, { status: 500 });
   }
+
+  // Sent after the response, so the guest never waits for the mail server.
+  const adminUrl = new URL("/admin/reservations?status=pending", request.url).toString();
+  after(() => notifyNewReservation(input, adminUrl));
 
   return Response.json({ ok: true });
 }
