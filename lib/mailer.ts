@@ -15,7 +15,7 @@ export function isMailerConfigured() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && process.env.RESERVATION_NOTIFY_EMAIL);
 }
 
-function getMailer(): Transporter {
+export function getMailer(): Transporter {
   const auth = { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD };
   transporter ??= process.env.SMTP_HOST
     ? nodemailer.createTransport({
@@ -28,7 +28,7 @@ function getMailer(): Transporter {
   return transporter;
 }
 
-const escape = (value: string) =>
+export const escape = (value: string) =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 /* Tells the bar about a new request. Never throws: a failed email must not lose the booking. */

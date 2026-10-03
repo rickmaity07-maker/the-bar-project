@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
 import { hashPassword, requireOwner } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { notifyGuest, type GuestBooking, type GuestMailKind } from "@/lib/guest-mail";
 import { defaultMenu, FALLBACK_DRINK_IMAGE } from "@/lib/site";
 
 /*
@@ -34,12 +37,25 @@ export async function setReservationStatus(form: FormData) {
   const status = text(form, "status") as (typeof STATUSES)[number];
   if (!STATUSES.includes(status)) return;
 
-  const rows = (await db()`
+  const sql = db();
+  const [before] = (await sql`select status from reservations where id = ${id}`) as { status: string }[];
+  const rows = (await sql`
     update reservations set status = ${status}, updated_at = now(), updated_by = ${me.id}
     where id = ${id}
-    returning name, date::text as date
-  `) as { name: string; date: string }[];
-  if (rows[0]) await logActivity(me, `reservation.${status}`, "reservation", id, `${rows[0].name}, ${rows[0].date}`);
+    returning name, email, date::text as date, to_char(time, 'HH24:MI') as time,
+      to_char(end_time, 'HH24:MI') as end_time, guests, is_private, locale
+  `) as GuestBooking[];
+  const booking = rows[0];
+  if (booking) await logActivity(me, `reservation.${status}`, "reservation", id, `${booking.name}, ${booking.date}`);
+
+  // The guest hears about every decision; reopening a request is internal and stays quiet.
+  const mail: Partial<Record<string, GuestMailKind>> = { confirmed: "confirmed", declined: "declined", cancelled: "cancelled" };
+  const kind = mail[status];
+  if (booking && kind && before?.status !== status) {
+    const host = (await headers()).get("host");
+    const origin = host ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : "";
+    after(() => notifyGuest(kind, booking, origin));
+  }
   refresh();
 }
 

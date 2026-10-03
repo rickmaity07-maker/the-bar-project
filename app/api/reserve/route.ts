@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { getSession } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
+import { notifyGuest } from "@/lib/guest-mail";
 import { notifyNewReservation } from "@/lib/mailer";
 import { validateReservation, type ReservationInput } from "@/lib/reservation";
 import { getSiteData } from "@/lib/site-data";
@@ -72,6 +73,18 @@ export async function POST(request: Request) {
   // Sent after the response, so the guest never waits for the mail server.
   const adminUrl = new URL("/admin/reservations?status=pending", request.url).toString();
   after(() => notifyNewReservation(input, adminUrl));
+  // And a receipt to the guest, at the address the booking was made with.
+  const booking = {
+    name: input.name,
+    email: input.email,
+    date: input.date,
+    time: input.time,
+    end_time: input.endTime || null,
+    guests: Number(input.guests),
+    is_private: isPrivate,
+    locale: body.locale === "en" ? "en" : "de",
+  };
+  after(() => notifyGuest("received", booking, new URL(request.url).origin));
 
   return Response.json({ ok: true });
 }
