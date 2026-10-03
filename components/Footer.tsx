@@ -65,8 +65,11 @@ export default function Footer() {
         BAR-05
       </p>
 
-      <p className="mx-auto mt-8 w-full max-w-[1400px] text-sm text-mist">
-        {t.footer.credit}
+      <p className="mx-auto mt-8 flex w-full max-w-[1400px] flex-wrap gap-x-6 gap-y-2 text-sm text-mist">
+        <span>{t.footer.credit}</span>
+        <a href="/datenschutz" className="underline-offset-4 transition-colors hover:text-foam hover:underline">
+          {t.footer.privacy}
+        </a>
       </p>
     </footer>
   );

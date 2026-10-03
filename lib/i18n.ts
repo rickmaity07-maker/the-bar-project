@@ -304,6 +304,7 @@ const de = {
     contact: "Kontakt",
     onThisPage: "Auf dieser Seite",
     navLabel: "Fußzeile",
+    privacy: "Datenschutz",
     credit: "Bar-05, Kornmarkt 7, 97421 Schweinfurt.",
   },
   login: {
@@ -675,6 +676,7 @@ const en: Dict = {
     contact: "Contact",
     onThisPage: "On this page",
     navLabel: "Footer",
+    privacy: "Privacy policy",
     credit: "Bar-05, Kornmarkt 7, 97421 Schweinfurt.",
   },
   login: {
