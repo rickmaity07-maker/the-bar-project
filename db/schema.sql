@@ -105,3 +105,45 @@ create index if not exists reservations_user_idx on reservations (user_id);
 
 -- Google sign-in: the Google account id; password_hash is '' for accounts that only use Google.
 alter table users add column if not exists google_sub text unique;
+
+-- The bar's own details, shown in the footer, the visit section, the booking section, emails and the privacy policy.
+create table if not exists venue (
+  id integer primary key default 1 check (id = 1),
+  name text not null default 'Bar-05',
+  contact_name text not null default '',
+  street text not null default '',
+  postal_city text not null default '',
+  phone text not null default '',
+  maps_url text not null default '',
+  updated_at timestamptz
+);
+
+-- The "Abende" programme on the homepage.
+create table if not exists nights (
+  id uuid primary key default gen_random_uuid(),
+  sort integer not null default 0,
+  day_de text not null,
+  day_en text not null default '',
+  title_de text not null,
+  title_en text not null default '',
+  body_de text not null default '',
+  body_en text not null default '',
+  opens time not null default '18:00',
+  closes time not null default '00:00',
+  image text not null default '',
+  alt_de text not null default '',
+  alt_en text not null default '',
+  visible boolean not null default true
+);
+
+-- The gallery on the homepage.
+create table if not exists gallery_photos (
+  id uuid primary key default gen_random_uuid(),
+  sort integer not null default 0,
+  src text not null,
+  alt_de text not null default '',
+  alt_en text not null default '',
+  ratio text not null default 'aspect-[4/5]',
+  width text not null default 'md:w-[30vw]',
+  visible boolean not null default true
+);

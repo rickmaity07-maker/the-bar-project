@@ -1,9 +1,10 @@
 /*
-  The parts of the site the owner can edit in the admin portal: the menu and the
-  opening hours. The defaults below are what the site shows until the database
-  holds its own copy, and what "import" in the portal starts from.
+  The parts of the site that live in the database and are edited in the admin
+  portal: the bar's details, the menu, opening hours, the nights programme and
+  the gallery. The defaults below seed the database (npm run db:seed) and are
+  shown only if it is unreachable or a table is still empty.
 */
-import { POURS } from "@/lib/data";
+import { NIGHTS, POURS, ROOM, VENUE } from "@/lib/data";
 import { content } from "@/lib/i18n";
 
 export interface Bilingual {
@@ -37,7 +38,40 @@ export interface ClosedDate {
   reason: string;
 }
 
+export interface Venue {
+  name: string;
+  contactName: string;
+  street: string;
+  postalCity: string;
+  phone: string;
+  /* tel: link built from the phone number, German numbers in international form. */
+  phoneHref: string;
+  mapsUrl: string;
+}
+
+export interface Night {
+  id: string;
+  day: Bilingual;
+  title: Bilingual;
+  body: Bilingual;
+  alt: Bilingual;
+  opens: string;
+  closes: string;
+  image: string;
+}
+
+export interface GalleryPhoto {
+  id: string;
+  src: string;
+  alt: Bilingual;
+  ratio: string;
+  width: string;
+}
+
 export interface SiteData {
+  venue: Venue;
+  nights: Night[];
+  gallery: GalleryPhoto[];
   menu: MenuCategory[];
   /* Indexed like Date.getDay(): 0 is Sunday, 6 is Saturday. */
   week: DayHours[];
@@ -82,7 +116,53 @@ export function defaultMenu(): MenuCategory[] {
   }));
 }
 
+/* 0176 70220501 -> tel:+4917670220501 */
+export function phoneHref(phone: string) {
+  const digits = phone.replace(/[^\d+]/g, "");
+  return `tel:${digits.startsWith("0") && !digits.startsWith("00") ? `+49${digits.slice(1)}` : digits}`;
+}
+
+export const DEFAULT_VENUE: Venue = {
+  name: "Bar-05",
+  contactName: VENUE.contact,
+  street: content.de.visit.street,
+  postalCity: content.de.visit.city,
+  phone: VENUE.phone,
+  phoneHref: VENUE.phoneHref,
+  mapsUrl: VENUE.maps,
+};
+
+export function defaultNights(): Night[] {
+  return NIGHTS.map((night, i) => {
+    const de = content.de.nights.items[i];
+    const en = content.en.nights.items[i];
+    return {
+      id: `default-night-${i}`,
+      day: { de: de.day, en: en.day },
+      title: { de: de.title, en: en.title },
+      body: { de: de.body, en: en.body },
+      alt: { de: de.alt, en: en.alt },
+      opens: night.from,
+      closes: night.until,
+      image: night.image,
+    };
+  });
+}
+
+export function defaultGallery(): GalleryPhoto[] {
+  return ROOM.map((photo, i) => ({
+    id: `default-photo-${i}`,
+    src: photo.src,
+    alt: { de: content.de.gallery.alts[i], en: content.en.gallery.alts[i] },
+    ratio: photo.ratio,
+    width: photo.width,
+  }));
+}
+
 export const DEFAULT_SITE_DATA: SiteData = {
+  venue: DEFAULT_VENUE,
+  nights: defaultNights(),
+  gallery: defaultGallery(),
   menu: defaultMenu(),
   week: DEFAULT_WEEK,
   closedDates: [],

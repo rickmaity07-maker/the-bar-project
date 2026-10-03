@@ -5,7 +5,7 @@ import { ArrowUpRight, MapPin } from "@phosphor-icons/react";
 import Heading from "@/components/Heading";
 import Reveal from "@/components/Reveal";
 import { useSiteData } from "@/components/SiteData";
-import { PHOTOS, VENUE } from "@/lib/data";
+import { PHOTOS } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import { groupHours } from "@/lib/site";
 
@@ -21,7 +21,7 @@ const CORE =
 
 export default function Bento() {
   const { t } = useLanguage();
-  const { week } = useSiteData();
+  const { week, venue } = useSiteData();
 
   return (
     <section id="visit" className="mx-auto w-full max-w-[1400px] scroll-mt-28 px-4 py-20 md:px-10 md:py-48">
@@ -71,7 +71,7 @@ export default function Bento() {
 
         <Reveal delay={0.14} className={`md:col-span-5 ${SHELL}`}>
           <a
-            href={VENUE.maps}
+            href={venue.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={`${CORE} group flex flex-col justify-between gap-8 bg-kelp p-7 md:p-9`}
@@ -83,9 +83,9 @@ export default function Bento() {
               </span>
             </span>
             <span>
-              <span className="display block text-3xl text-foam md:text-4xl">{t.visit.street}</span>
+              <span className="display block text-3xl text-foam md:text-4xl">{venue.street}</span>
               <span className="mt-2 block text-base text-mist">
-                {t.visit.city}. {t.visit.mapsNote}
+                {venue.postalCity}. {t.visit.mapsNote}
               </span>
             </span>
           </a>

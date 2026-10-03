@@ -46,6 +46,9 @@ const LINKS = [
   { href: "/admin/reservations", label: "Reservierungen" },
   { href: "/admin/menu", label: "Karte & Preise" },
   { href: "/admin/hours", label: "Öffnungszeiten" },
+  { href: "/admin/venue", label: "Bar & Kontakt" },
+  { href: "/admin/nights", label: "Abende" },
+  { href: "/admin/gallery", label: "Galerie" },
   { href: "/admin/users", label: "Nutzer & Rollen" },
   { href: "/admin/activity", label: "Aktivität" },
 ];

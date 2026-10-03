@@ -19,6 +19,9 @@ const AREAS: [string, string][] = [
   ["reservation", "Reservierungen"],
   ["menu", "Karte"],
   ["hours", "Öffnungszeiten"],
+  ["venue", "Bar & Kontakt"],
+  ["night", "Abende"],
+  ["gallery", "Galerie"],
   ["user", "Nutzer"],
 ];
 const PAGE_SIZE = 100;

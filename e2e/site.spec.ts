@@ -684,6 +684,120 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok: msg.includes("geschlossen"), extra: msg };
   });
 
+  /* ================= ADMIN: BAR DETAILS, NIGHTS, GALLERY ================= */
+  section = "Admin: content in the database";
+  const home = async () => {
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await settle(page, 800);
+  };
+  await check("Bar & Kontakt: a new phone number shows in the footer, booking section and privacy policy", async () => {
+    await admin.goto(`${BASE}/admin/venue`);
+    const original = await admin.locator('input[name="phone"]').inputValue();
+    await admin.locator('input[name="phone"]').fill("0171 0000005");
+    await admin.getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await home();
+    const footer = await page.locator("footer").first().innerText();
+    const tel = await page.locator('footer a[href^="tel:"]').getAttribute("href");
+    const booking = await page.locator("#reserve").innerText();
+    await page.goto(`${BASE}/datenschutz`);
+    const privacy = await page.locator("main").innerText();
+    await admin.goto(`${BASE}/admin/venue`);
+    await admin.locator('input[name="phone"]').fill(original);
+    await admin.getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    const ok = footer.includes("0171 0000005") && tel === "tel:+491710000005" && booking.includes("0171 0000005") && privacy.includes("0171 0000005");
+    return { ok, extra: `tel=${tel}` };
+  });
+  await check("Bar & Kontakt: the address shows in the visit section", async () => {
+    await home();
+    const visit = await page.locator("#visit").innerText();
+    return { ok: visit.includes("Kornmarkt 7") && visit.includes("97421 Schweinfurt") };
+  });
+  await check("Abende: the 4 cards come from the database", async () => {
+    await admin.goto(`${BASE}/admin/nights`);
+    const inAdmin = await admin.getByText("4 Karten").count();
+    await home();
+    return { ok: inAdmin === 1 && (await page.locator(".night-card").count()) === 4 };
+  });
+  await check("Abende: editing a title shows on the website, hiding removes the card", async () => {
+    await admin.goto(`${BASE}/admin/nights`);
+    const first = admin.locator("section").filter({ has: admin.locator('input[name="title_de"]') }).first();
+    const title = await first.locator('input[name="title_de"]').inputValue();
+    await first.locator('input[name="title_de"]').fill("Testabend mit DJ");
+    await first.getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await home();
+    const shown = (await page.locator("#nights").innerText()).includes("Testabend mit DJ");
+    await admin.goto(`${BASE}/admin/nights`);
+    const again = admin.locator("section").filter({ has: admin.locator('input[name="title_de"]') }).first();
+    await again.locator('input[name="visible"]').uncheck();
+    await again.getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await home();
+    const hidden = await page.locator(".night-card").count();
+    await admin.goto(`${BASE}/admin/nights`);
+    const restore = admin.locator("section").filter({ has: admin.locator('input[name="title_de"]') }).first();
+    await restore.locator('input[name="title_de"]').fill(title);
+    await restore.locator('input[name="visible"]').check();
+    await restore.getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await home();
+    const back = await page.locator(".night-card").count();
+    return { ok: shown && hidden === 3 && back === 4, extra: `shown=${shown} hidden=${hidden} back=${back}` };
+  });
+  await check("Abende: adding and deleting a night", async () => {
+    await admin.goto(`${BASE}/admin/nights`);
+    const add = admin.locator("section", { hasText: "Neuer Abend" });
+    await add.locator('input[name="day_de"]').fill("Montag");
+    await add.locator('input[name="title_de"]').fill("Sonderabend");
+    await add.getByRole("button", { name: "Abend anlegen" }).click();
+    await settle(admin);
+    await home();
+    const added = await page.locator(".night-card").count();
+    await admin.goto(`${BASE}/admin/nights`);
+    await admin.locator("section", { hasText: "Montag · Sonderabend" }).getByRole("button", { name: "Löschen" }).click();
+    await settle(admin);
+    await home();
+    return { ok: added === 5 && (await page.locator(".night-card").count()) === 4, extra: `added=${added}` };
+  });
+  await check("Galerie: hiding, adding, reordering and removing photos", async () => {
+    await home();
+    const start = await page.locator("figure.drift-item").count();
+    const firstBefore = await page.locator("figure.drift-item img").first().getAttribute("alt");
+    await admin.goto(`${BASE}/admin/gallery`);
+    const first = () => admin.locator("section").filter({ has: admin.locator('select[name="ratio"]') }).first();
+    await first().locator('input[name="visible"]').uncheck();
+    await first().getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await home();
+    const hidden = await page.locator("figure.drift-item").count();
+    await admin.goto(`${BASE}/admin/gallery`);
+    await first().locator('input[name="visible"]').check();
+    await first().getByRole("button", { name: "Speichern" }).click();
+    await settle(admin);
+    await first().getByRole("button", { name: "↓" }).click();
+    await settle(admin);
+    await home();
+    const firstAfter = await page.locator("figure.drift-item img").first().getAttribute("alt");
+    await admin.goto(`${BASE}/admin/gallery`);
+    await admin.locator("section").filter({ has: admin.locator('select[name="ratio"]') }).nth(1).getByRole("button", { name: "↑" }).click();
+    await settle(admin);
+    const add = admin.locator("section", { hasText: "Foto hinzufügen" });
+    await add.locator('input[name="alt_de"]').fill("Testfoto");
+    await add.getByRole("button", { name: "Hinzufügen" }).click();
+    await settle(admin);
+    await home();
+    const added = await page.locator("figure.drift-item").count();
+    await admin.goto(`${BASE}/admin/gallery`);
+    await admin.locator("section").filter({ has: admin.locator('input[name="alt_de"][value="Testfoto"]') }).getByRole("button", { name: "Entfernen" }).click();
+    await settle(admin);
+    await home();
+    const end = await page.locator("figure.drift-item").count();
+    const ok = start === 6 && hidden === 5 && firstAfter !== firstBefore && added === 7 && end === 6;
+    return { ok, extra: `start=${start} hidden=${hidden} reordered=${firstAfter !== firstBefore} added=${added} end=${end}` };
+  });
+
   /* ================= ADMIN: USERS ================= */
   section = "Admin: users & roles";
   const staffCtx = await browser.newContext();
@@ -766,7 +880,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   await check("Every kind of change is logged", async () => {
     await admin.goto(`${BASE}/admin/activity`);
     const t = await admin.locator("main ul").innerText();
-    const need = ["Profil geändert", "Reservierung bestätigt", "Reservierung storniert", "Reservierung abgelehnt", "Notiz gespeichert", "Reservierung gelöscht", "Kategorie angelegt", "Getränk angelegt", "Getränk geändert", "Getränk verschoben", "Kategorie gelöscht", "Öffnungszeiten geändert", "Schließtag eingetragen", "Schließtag entfernt", "Nutzer angelegt", "Rolle geändert", "Nutzer deaktiviert", "Passwort zurückgesetzt", "Konto registriert"];
+    const need = ["Bar & Kontakt geändert", "Abend geändert", "Abend angelegt", "Abend gelöscht", "Galeriefoto geändert", "Galeriefoto verschoben", "Galeriefoto hinzugefügt", "Galeriefoto entfernt", "Profil geändert", "Reservierung bestätigt", "Reservierung storniert", "Reservierung abgelehnt", "Notiz gespeichert", "Reservierung gelöscht", "Kategorie angelegt", "Getränk angelegt", "Getränk geändert", "Getränk verschoben", "Kategorie gelöscht", "Öffnungszeiten geändert", "Schließtag eingetragen", "Schließtag entfernt", "Nutzer angelegt", "Rolle geändert", "Nutzer deaktiviert", "Passwort zurückgesetzt", "Konto registriert"];
     const missing = need.filter((s) => !t.includes(s));
     return { ok: missing.length === 0, extra: missing.join(", ") || `${need.length} kinds found` };
   });

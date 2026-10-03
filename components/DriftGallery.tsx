@@ -6,7 +6,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import Heading from "@/components/Heading";
-import { ROOM } from "@/lib/data";
+import { useSiteData } from "@/components/SiteData";
 import { useLanguage } from "@/lib/language";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -19,7 +19,8 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 export default function DriftGallery() {
   const wrap = useRef<HTMLElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { gallery } = useSiteData();
 
   useGSAP(
     () => {
@@ -80,9 +81,9 @@ export default function DriftGallery() {
           </p>
         </div>
 
-        {ROOM.map((photo, index) => (
+        {gallery.map((photo) => (
           <figure
-            key={photo.src}
+            key={photo.id}
             className={`drift-item group w-[78vw] shrink-0 snap-center rounded-[2rem] bg-foam/5 p-1.5 ring-1 ring-foam/10 ${photo.width}`}
           >
             <div
@@ -90,7 +91,7 @@ export default function DriftGallery() {
             >
               <Image
                 src={photo.src}
-                alt={t.gallery.alts[index]}
+                alt={photo.alt[locale]}
                 fill
                 sizes="(min-width: 768px) 46vw, 78vw"
                 className="object-cover transition-transform duration-700 ease-drift group-hover:scale-105"

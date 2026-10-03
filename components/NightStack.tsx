@@ -6,7 +6,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import Heading from "@/components/Heading";
-import { NIGHTS } from "@/lib/data";
+import { useSiteData } from "@/components/SiteData";
 import { useLanguage } from "@/lib/language";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
@@ -17,7 +17,8 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 */
 export default function NightStack() {
   const root = useRef<HTMLElement>(null);
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { nights } = useSiteData();
 
   useGSAP(
     () => {
@@ -50,9 +51,9 @@ export default function NightStack() {
       </div>
 
       <div className="relative">
-        {NIGHTS.map((night, index) => (
+        {nights.map((night) => (
           <div
-            key={index}
+            key={night.id}
             className="night-card sticky top-0 flex h-[100dvh] items-center px-4 pb-6 pt-24 md:px-10 xl:px-36"
           >
             <article className="night-inner relative mx-auto grid h-full w-full max-w-[1400px] origin-top grid-cols-1 overflow-hidden rounded-[2rem] bg-[linear-gradient(150deg,#2b6170_0%,#18404c_45%,#10262f_100%)] shadow-[inset_0_1px_1px_rgba(232,239,236,0.25)] ring-1 ring-foam/25 md:grid-cols-2">
@@ -64,23 +65,23 @@ export default function NightStack() {
               <div className="flex flex-col justify-between gap-6 p-7 md:p-12">
                 <div>
                   <h3 className="display text-[clamp(3rem,6.4vw,6rem)] leading-[1] text-foam">
-                    {t.nights.items[index].day}
+                    {night.day[locale]}
                   </h3>
                   <p className="display mt-4 text-2xl italic text-buoy md:text-4xl">
-                    {t.nights.items[index].title}
+                    {night.title[locale]}
                   </p>
                   <p className="mt-4 max-w-[40ch] text-base leading-relaxed text-foam/85 md:text-lg">
-                    {t.nights.items[index].body}
+                    {night.body[locale]}
                   </p>
                 </div>
                 <p className="display text-2xl text-foam md:text-3xl">
-                  {night.from} {t.nights.until} {night.until}
+                  {night.opens} {t.nights.until} {night.closes}
                 </p>
               </div>
               <div className="relative min-h-[32vh] md:min-h-0">
                 <Image
                   src={night.image}
-                  alt={t.nights.items[index].alt}
+                  alt={night.alt[locale]}
                   fill
                   sizes="(min-width: 768px) 50vw, 100vw"
                   className="object-cover brightness-110 saturate-110"

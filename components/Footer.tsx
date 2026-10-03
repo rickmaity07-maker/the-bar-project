@@ -1,13 +1,13 @@
 "use client";
 
 import { useSiteData } from "@/components/SiteData";
-import { NAV_TARGETS, VENUE } from "@/lib/data";
+import { NAV_TARGETS } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import { groupHours } from "@/lib/site";
 
 export default function Footer() {
   const { t } = useLanguage();
-  const { week } = useSiteData();
+  const { week, venue } = useSiteData();
 
   return (
     <footer className="relative z-10 overflow-hidden px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-10 md:px-10 md:pt-16">
@@ -15,8 +15,8 @@ export default function Footer() {
         <div>
           <h2 className="label text-foam">{t.footer.findUs}</h2>
           <address className="mt-4 space-y-1 text-base not-italic text-foam/85">
-            <p>{t.visit.street}</p>
-            <p>{t.visit.city}</p>
+            <p>{venue.street}</p>
+            <p>{venue.postalCity}</p>
           </address>
         </div>
 
@@ -35,10 +35,10 @@ export default function Footer() {
         <div>
           <h2 className="label text-foam">{t.footer.contact}</h2>
           <ul className="mt-2 text-base text-foam/85 md:mt-4 md:space-y-1">
-            <li>{VENUE.contact}</li>
+            <li>{venue.contactName}</li>
             <li>
-              <a href={VENUE.phoneHref} className="inline-flex min-h-11 items-center transition-colors duration-500 ease-drift hover:text-foam md:min-h-0">
-                {VENUE.phone}
+              <a href={venue.phoneHref} className="inline-flex min-h-11 items-center transition-colors duration-500 ease-drift hover:text-foam md:min-h-0">
+                {venue.phone}
               </a>
             </li>
           </ul>

@@ -1,6 +1,6 @@
 import "server-only";
 import { escape, getMailer, isMailerConfigured } from "@/lib/mailer";
-import { VENUE } from "@/lib/data";
+import { getSiteData } from "@/lib/site-data";
 
 /*
   Emails to the guest about their own booking, in the language they booked in:
@@ -82,6 +82,8 @@ const COPY = {
 export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, origin: string) {
   if (!isMailerConfigured() || !booking.email) return;
   const c = booking.locale === "en" ? COPY.en : COPY.de;
+  const { venue } = await getSiteData();
+  const address = `${venue.name}, ${venue.street}, ${venue.postalCity}`;
   const date = new Date(`${booking.date}T12:00:00Z`).toLocaleDateString(c.dateLocale, {
     weekday: "long",
     day: "numeric",
@@ -105,8 +107,8 @@ export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, or
     ...rows.map(([label, value]) => `${label}: ${value}`),
     "",
     `${c.profile}: ${profileUrl}`,
-    `${c.phone}: ${VENUE.phone}`,
-    "Bar-05, Kornmarkt 7, 97421 Schweinfurt",
+    `${c.phone}: ${venue.phone}`,
+    address,
   ].join("\n");
   const html = `<!doctype html><html><body style="margin:0;background:#05090b;padding:24px;font-family:Helvetica,Arial,sans-serif;color:#e8efec">
 <div style="max-width:560px;margin:0 auto;background:#0a1317;border-radius:24px;padding:28px">
@@ -121,7 +123,7 @@ export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, or
     )
     .join("")}</table>
   <a href="${escape(profileUrl)}" style="display:inline-block;margin-top:24px;background:#ff6a3d;color:#05090b;text-decoration:none;font-weight:600;font-size:13px;letter-spacing:2px;padding:14px 22px;border-radius:999px">${escape(c.profile.toUpperCase())}</a>
-  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#9db0b2">${escape(c.phone)}: ${escape(VENUE.phone)}<br>Bar-05, Kornmarkt 7, 97421 Schweinfurt</p>
+  <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#9db0b2">${escape(c.phone)}: ${escape(venue.phone)}<br>${escape(address)}</p>
 </div></body></html>`;
 
   try {

@@ -118,3 +118,15 @@ export const ROOM = [
 
 /* Mean depth of the Atlantic Ocean in metres. */
 export const MAX_DEPTH = 3646;
+
+/* Every photo shipped with the site, for the photo pickers in the admin portal. */
+export const PHOTO_LIBRARY: string[] = [
+  ...new Set([
+    ...Object.values(PHOTOS),
+    ...COCKTAIL,
+    ...WINE,
+    ...BEER,
+    ...SPIRIT,
+    ...DAY_BEATS.map((beat) => beat.image),
+  ]),
+];

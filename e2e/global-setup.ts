@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { randomBytes, scryptSync } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
@@ -38,6 +39,12 @@ export default async function globalSetup() {
       (6, false, '18:00', '03:00')
     on conflict (weekday) do update set closed = excluded.closed, opens = excluded.opens, closes = excluded.closes
   `;
+  // Bar details, nights and gallery start from the site's defaults every run.
+  await sql`delete from venue`;
+  await sql`delete from nights`;
+  await sql`delete from gallery_photos`;
+  execSync("npx tsx scripts/seed-content.mts", { env: { ...process.env, DATABASE_URL: testUrl }, stdio: "ignore" });
+
   const [{ count }] = (await sql`select count(*)::int as count from menu_items`) as { count: number }[];
   if (count === 0) throw new Error("The test branch has no menu. Branch it from the live database (e2e/README.md).");
 

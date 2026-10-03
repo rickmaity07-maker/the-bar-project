@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { VENUE } from "@/lib/data";
+import { getSiteData } from "@/lib/site-data";
 import { RETENTION } from "@/lib/retention";
 
 export const metadata: Metadata = {
@@ -25,7 +25,8 @@ const ROW = "border-t border-foam/10 py-3 pr-4 align-top";
   with the code: retention periods come from lib/retention.ts. The operator
   should have it checked before relying on it legally.
 */
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const { venue } = await getSiteData();
   return (
     <main className="mx-auto w-full max-w-[820px] px-4 py-14 md:py-20">
       <Link href="/" className="display wordmark text-2xl tracking-[0.14em] text-foam">
@@ -36,13 +37,13 @@ export default function PrivacyPage() {
 
       <Section title="1. Verantwortlich">
         <p>
-          Bar-05
+          {venue.name}
           <br />
-          {VENUE.contact}
+          {venue.contactName}
           <br />
-          Kornmarkt 7, 97421 Schweinfurt
+          {venue.street}, {venue.postalCity}
           <br />
-          Telefon: <a href={VENUE.phoneHref} className="underline underline-offset-4">{VENUE.phone}</a>
+          Telefon: <a href={venue.phoneHref} className="underline underline-offset-4">{venue.phone}</a>
         </p>
         <p>
           Für alle Fragen zum Datenschutz und für Anfragen zu euren Rechten erreicht ihr uns unter dieser Adresse

@@ -7,7 +7,6 @@ import Heading from "@/components/Heading";
 import Reveal from "@/components/Reveal";
 import { useSiteData } from "@/components/SiteData";
 import { loginHref, useAccount, type Account } from "@/lib/account";
-import { VENUE } from "@/lib/data";
 import { useLanguage } from "@/lib/language";
 import {
   MAX_MESSAGE_LENGTH,
@@ -68,6 +67,7 @@ function BookingForm({ account }: { account: Account }) {
   const [status, setStatus] = useState<Status>("idle");
   const { t, locale } = useLanguage();
   const schedule = useSiteData();
+  const { venue } = schedule;
   const copy = t.reserve;
   // Validation returns codes; the sentence shown depends on the current language.
   const message = (key: ReservationField) => {
@@ -311,7 +311,7 @@ function BookingForm({ account }: { account: Account }) {
               </p>
               {status === "failed" && (
                 <p role="alert" className="text-sm text-buoy">
-                  {copy.failed} {VENUE.phone}.
+                  {copy.failed} {venue.phone}.
                 </p>
               )}
               {status === "signedOut" && (
@@ -334,6 +334,7 @@ export default function Reserve() {
   const { t } = useLanguage();
   const copy = t.reserve;
   const { account, loading } = useAccount();
+  const { venue } = useSiteData();
 
   return (
     <section
@@ -348,11 +349,11 @@ export default function Reserve() {
           {copy.body}
         </p>
         <a
-          href={VENUE.phoneHref}
+          href={venue.phoneHref}
           className="display mt-6 inline-flex min-h-11 items-center gap-3 text-3xl text-foam transition-colors duration-500 ease-drift hover:text-buoy"
         >
           <Phone size={22} weight="light" className="text-buoy" />
-          {VENUE.phone}
+          {venue.phone}
         </a>
       </Reveal>
 
