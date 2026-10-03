@@ -58,6 +58,12 @@ export const DEFAULT_WEEK: DayHours[] = [
   UNTIL_THREE,
 ];
 
+/* Older menu rows stored Unsplash addresses; they point at the same photo hosted here. */
+export function localPhoto(url: string) {
+  const id = url.match(/photo-(\d+-[0-9a-f]+)/)?.[1];
+  return url.startsWith("https://images.unsplash.com/") && id ? `/photos/${id}.jpg` : url;
+}
+
 /* Shown for drinks added in the portal, which have no photo of their own. */
 export const FALLBACK_DRINK_IMAGE = POURS[0][0].image;
 

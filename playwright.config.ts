@@ -12,6 +12,9 @@ for (const file of [".env.test.local", ".env.local"]) {
 
 export const PORT = 3010;
 
+// Shared by the test server and the spec (worker processes inherit it from the runner).
+process.env.E2E_CRON_SECRET ??= `e2e-${Math.random().toString(36).slice(2)}`;
+
 export default defineConfig({
   testDir: "e2e",
   globalSetup: "./e2e/global-setup.ts",
@@ -38,6 +41,7 @@ export default defineConfig({
       // Separate build folder, so a test build never replaces the normal one.
       NEXT_DIST_DIR: ".next-e2e",
       GMAIL_FROM_NAME: "Bar-05 TEST",
+      CRON_SECRET: process.env.E2E_CRON_SECRET,
       RESERVATION_NOTIFY_EMAIL: process.env.TEST_NOTIFY_EMAIL ?? process.env.GMAIL_USER ?? "",
     },
   },

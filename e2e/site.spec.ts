@@ -104,7 +104,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     const href = await page.locator('footer a[href="/datenschutz"]').getAttribute("href");
     const res = await page.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
     const t = await page.locator("main").innerText();
-    const need = ["Verantwortlich", "Kornmarkt 7", "Vercel", "Unsplash", "Google", "Gmail", "Neon", "Sitzungs-Cookie", "Eure Rechte"];
+    const need = ["Verantwortlich", "Kornmarkt 7", "Vercel", "Google", "Gmail", "Neon", "Ohio", "Wie lange wir Daten speichern", "6 Monate", "bar05-locale", "§ 25 Abs. 2", "Eure Rechte", "Aufsichtsbehörde"];
     const missing = need.filter((x) => !t.includes(x));
     return { ok: res?.status() === 200 && (await page.title()).startsWith("Datenschutz") && missing.length === 0, extra: missing.join(",") || "all sections" };
   });
@@ -115,6 +115,55 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok: Boolean(google && email && google.y < email.y) };
   });
   await check("Unknown page returns 404", async () => ({ ok: (await fetch(`${BASE}/gibt-es-nicht`)).status === 404 }));
+
+  /* ================= DATA PROTECTION ================= */
+  section = "Data protection";
+  await check("Browser contacts no third party (photos, fonts, scripts all from this site)", async () => {
+    const probe = await guestCtx.newPage();
+    const foreign = new Set<string>();
+    probe.on("request", (r) => {
+      const host = new URL(r.url()).host;
+      if (host !== new URL(BASE).host) foreign.add(host);
+    });
+    for (const path of ["/", "/login", "/datenschutz"]) {
+      await probe.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+      for (let y = 0; y < 24_000; y += 1500) {
+        await probe.mouse.wheel(0, 1500);
+        await probe.waitForTimeout(100);
+      }
+      await probe.waitForLoadState("networkidle");
+    }
+    const photos = await probe.locator("img").evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).currentSrc).filter(Boolean).length);
+    await probe.close();
+    return { ok: foreign.size === 0, extra: foreign.size ? [...foreign].join(", ") : `none; ${photos} images served locally` };
+  });
+  await check("No cookies or storage before signing in", async () => {
+    const fresh = await browser.newContext();
+    const p = await fresh.newPage();
+    await p.goto(BASE, { waitUntil: "networkidle" });
+    const cookies = (await fresh.cookies()).length;
+    const storage = await p.evaluate(() => localStorage.length);
+    await fresh.close();
+    return { ok: cookies === 0 && storage === 0, extra: `${cookies} cookies, ${storage} storage keys` };
+  });
+  await check("Security headers on every page", async () => {
+    const r = await fetch(`${BASE}/login`);
+    const h = (k: string) => r.headers.get(k) ?? "";
+    const ok = h("x-content-type-options") === "nosniff" && h("x-frame-options") === "DENY" &&
+      h("referrer-policy") === "strict-origin-when-cross-origin" && h("content-security-policy").includes("frame-ancestors 'none'") &&
+      h("permissions-policy").includes("camera=()");
+    return { ok, extra: ok ? "nosniff, DENY, referrer, CSP, permissions" : JSON.stringify(Object.fromEntries(r.headers)) };
+  });
+  await check("Clean-up job refuses calls without the secret", async () => {
+    const none = await fetch(`${BASE}/api/cron/cleanup`);
+    const wrong = await fetch(`${BASE}/api/cron/cleanup`, { headers: { authorization: "Bearer falsch" } });
+    return { ok: none.status === 401 && wrong.status === 401, extra: `${none.status}/${wrong.status}` };
+  });
+  await check("Clean-up job deletes bookings past the 6-month limit", async () => {
+    const r = await fetch(`${BASE}/api/cron/cleanup`, { headers: { authorization: `Bearer ${process.env.E2E_CRON_SECRET}` } });
+    const body = await r.json();
+    return { ok: r.status === 200 && body.deleted?.reservations === 1, extra: JSON.stringify(body.deleted) };
+  });
 
   /* ================= BOOKING NEEDS AN ACCOUNT ================= */
   section = "Booking gate & sign-up";
@@ -146,6 +195,10 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     const signupTab = await page.getByRole("tab", { name: "Registrieren" }).getAttribute("aria-selected");
     return { ok: signupTab === "true" && (await page.getByText("zurück zur Reservierung").count()) === 1, extra: page.url() };
   });
+  await check("Sign-up form says what is stored and links the privacy policy", async () => {
+    const note = page.getByText("Für das Konto speichern wir E-Mail, Name");
+    return { ok: (await note.count()) === 1 && (await page.locator('form a[href="/datenschutz"]').count()) === 1 };
+  });
   await check("Sign-up returns straight to the booking form", async () => {
     await page.fill('input[name="name"]', "Gast Konto");
     await page.fill('input[name="email"]', GUEST);
@@ -165,6 +218,8 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   section = "Reservation form";
   const errorsShown = () => page.locator('#reserve [id$="-error"]').allInnerTexts();
   await form();
+  await check("Booking form links the privacy policy", async () =>
+    (await page.locator('#reserve a[href="/datenschutz"]').count()) === 1);
   await check("Cleared form shows name, phone, date and time errors", async () => {
     await page.fill("#name", "");
     await page.getByRole("button", { name: "Tisch anfragen" }).click();
@@ -767,6 +822,57 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   await check("Cancellation email names the guest and their account", async () => {
     const m = mails.find((x) => x.subject.startsWith("Storniert"));
     return { ok: Boolean(m && m.subject.includes("Storno Test") && m.source.includes(GUEST) && m.replyTo === GUEST), extra: m?.subject };
+  });
+
+  /* ================= DATA SUBJECT RIGHTS ================= */
+  section = "Guest rights (DSGVO)";
+  await check("'Meine Daten herunterladen' gives every stored detail as a file", async () => {
+    await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Meine Daten herunterladen" }).click()]);
+    const data = JSON.parse(readFileSync((await download.path())!, "utf8"));
+    const ok = data.account?.email === GUEST && data.reservations?.length >= 4 && !JSON.stringify(data).includes("scrypt$") &&
+      download.suggestedFilename() === "bar-05-meine-daten.json";
+    return { ok, extra: `${data.reservations?.length} bookings, ${data.activity?.length} log entries, no password hash` };
+  });
+  await check("Data download needs a signed-in account", async () => ({ ok: (await fetch(`${BASE}/api/profile/export`)).status === 401 }));
+  await check("Account deletion asks for the account's email", async () => {
+    await page.locator('input[name="confirm"]').fill("falsch@example.com");
+    await page.getByRole("button", { name: "Konto endgültig löschen" }).click();
+    await page.getByText("Die E-Mail stimmt nicht").waitFor({ timeout: 15_000 });
+    return true;
+  });
+  await check("'Konto löschen' removes the account, its bookings and its sign-in", async () => {
+    await page.locator('input[name="confirm"]').fill(GUEST);
+    await page.getByRole("button", { name: "Konto endgültig löschen" }).click();
+    await page.waitForURL(/konto=geloescht/, { timeout: 20_000 });
+    const signedOut = !(await guestCtx.cookies()).some((c) => c.name === "session");
+    await admin.goto(`${BASE}/admin/reservations?when=all&q=${encodeURIComponent(TAG)}`);
+    const left = await admin.locator("article").count();
+    await admin.goto(`${BASE}/admin/users`);
+    const listed = await admin.locator("section", { hasText: GUEST }).count();
+    return { ok: signedOut && left === 0 && listed === 0, extra: `signedOut=${signedOut} bookingsLeft=${left} accountListed=${listed}` };
+  });
+  await check("A deleted account can no longer sign in", async () => {
+    await page.goto(`${BASE}/login`);
+    await page.fill('input[name="email"]', GUEST);
+    await page.fill('input[name="password"]', "gast-passwort-2");
+    await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+    await page.getByText("E-Mail oder Passwort stimmen nicht.").waitFor({ timeout: 15_000 });
+    return true;
+  });
+  await check("The activity log no longer shows the deleted guest's address", async () => {
+    await admin.goto(`${BASE}/admin/activity`);
+    const t = await admin.locator("main").innerText();
+    return { ok: !t.includes(GUEST) && t.includes("Konto vom Gast gelöscht"), extra: t.includes(GUEST) ? "address still shown" : "anonymised" };
+  });
+  await check("The only owner cannot delete their own account", async () => {
+    await admin.goto(`${BASE}/admin/users`);
+    for (const promoted of await admin.locator("section", { hasText: "kollege@bar-05.test" }).getByRole("button", { name: "Zum Nutzer herabstufen" }).all()) await promoted.click();
+    await admin.goto(`${BASE}/profile`);
+    await admin.locator('input[name="confirm"]').fill(OWNER);
+    await admin.getByRole("button", { name: "Konto endgültig löschen" }).click();
+    await admin.getByText("Das einzige Inhaber-Konto kann nicht gelöscht werden").waitFor({ timeout: 15_000 });
+    return true;
   });
 
   /* ================= MOBILE ================= */

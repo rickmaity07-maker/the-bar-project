@@ -129,7 +129,7 @@ export async function notifyCancellation(booking: CancelledBooking, accountEmail
         .map((line) => escape(line) || "&nbsp;")
         .join("<br>")}</div>`,
     });
-    console.info("Cancellation email sent:", booking.name, booking.date);
+    console.info(`Cancellation email sent for ${booking.date}`);
   } catch (error) {
     console.error("Cancellation email failed:", error);
   }

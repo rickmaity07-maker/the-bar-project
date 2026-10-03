@@ -4,6 +4,7 @@ import {
   DEFAULT_SITE_DATA,
   DEFAULT_WEEK,
   FALLBACK_DRINK_IMAGE,
+  localPhoto,
   type ClosedDate,
   type DayHours,
   type MenuCategory,
@@ -68,7 +69,7 @@ export async function getSiteData(): Promise<SiteData> {
             name: pair(item.name_de, item.name_en),
             note: pair(item.note_de, item.note_en),
             price: item.price,
-            image: item.image || FALLBACK_DRINK_IMAGE,
+            image: localPhoto(item.image || FALLBACK_DRINK_IMAGE),
           })),
       }))
       .filter((category) => category.items.length > 0);

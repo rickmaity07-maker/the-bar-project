@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { logActivity } from "@/lib/activity";
-import { hashPassword, requireUser, revokeOtherSessions, verifyPassword } from "@/lib/auth";
+import { destroySession, hashPassword, requireUser, revokeOtherSessions, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifyCancellation } from "@/lib/mailer";
 
@@ -61,4 +62,41 @@ export async function cancelMyReservation(form: FormData) {
   after(() => notifyCancellation(rows[0], me.email));
   revalidatePath("/profile");
   revalidatePath("/admin", "layout");
+}
+
+export type DeleteError = "lastOwner" | "confirm";
+
+/*
+  Right to erasure (Art. 17 DSGVO): removes the account, its sessions and its
+  bookings, and replaces the address in the activity log. The bar is told about
+  upcoming bookings that disappear with it, so no table is kept for nobody.
+*/
+export async function deleteMyAccount(_previous: DeleteError | null, form: FormData): Promise<DeleteError | null> {
+  const me = await requireUser();
+  if (String(form.get("confirm") ?? "").trim().toLowerCase() !== me.email.toLowerCase()) return "confirm";
+  const sql = db();
+  if (me.role === "owner") {
+    const [{ count }] = (await sql`select count(*)::int as count from users where role = 'owner' and active`) as { count: number }[];
+    if (count <= 1) return "lastOwner";
+  }
+
+  const upcoming = (await sql`
+    select name, phone, date::text as date, to_char(time, 'HH24:MI') as time, guests, is_private
+    from reservations
+    where user_id = ${me.id} and status in ('pending', 'confirmed')
+      and date >= (now() at time zone 'Europe/Berlin')::date
+  `) as { name: string; phone: string; date: string; time: string; guests: number; is_private: boolean }[];
+
+  await sql.transaction([
+    sql`delete from reservations where user_id = ${me.id}`,
+    sql`update activity_log set user_email = 'gelöschtes Konto', detail = '' where user_id = ${me.id}`,
+    sql`delete from login_attempts where email = ${me.email}`,
+    sql`delete from users where id = ${me.id}`,
+  ]);
+  await logActivity(null, "user.deleted", "user", "", `${upcoming.length} offene Reservierungen entfernt`);
+  for (const booking of upcoming) after(() => notifyCancellation(booking, "gelöschtes Konto"));
+
+  await destroySession();
+  revalidatePath("/admin", "layout");
+  redirect("/?konto=geloescht");
 }

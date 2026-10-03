@@ -132,7 +132,7 @@ export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, or
       text,
       html,
     });
-    console.info(`Guest email sent (${kind}):`, booking.name, booking.date);
+    console.info(`Guest email sent (${kind}) for ${booking.date}`);
   } catch (error) {
     console.error(`Guest email failed (${kind}):`, error);
   }

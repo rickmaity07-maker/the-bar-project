@@ -106,6 +106,14 @@ export default function LoginForm({ next, initialMode, google, googleFailed }: P
           {mode === "signup" && <span className="text-sm text-mist">{copy.passwordHint}</span>}
         </label>
 
+        <p className="text-xs leading-relaxed text-mist">
+          {copy.privacyNote}{" "}
+          <a href="/datenschutz" className="underline underline-offset-2 hover:text-foam">
+            {copy.privacyLink}
+          </a>
+          .
+        </p>
+
         {state.error && (
           <p role="alert" className="text-sm text-buoy">
             {copy.errors[state.error]}

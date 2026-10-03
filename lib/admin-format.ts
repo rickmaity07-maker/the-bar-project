@@ -68,6 +68,8 @@ const ACTIONS: Record<string, string> = {
   "user.signout": "Abgemeldet",
   "user.profile": "Profil geändert",
   "user.google_link": "Mit Google verknüpft",
+  "user.deleted": "Konto vom Gast gelöscht",
+  "retention.cleanup": "Alte Daten automatisch gelöscht",
   "user.create": "Nutzer angelegt",
   "user.role": "Rolle geändert",
   "user.activate": "Nutzer aktiviert",

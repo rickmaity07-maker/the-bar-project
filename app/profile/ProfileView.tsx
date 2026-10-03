@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 import type { SessionUser } from "@/lib/auth";
 import { useLanguage } from "@/lib/language";
 import { signOut } from "../login/actions";
-import { cancelMyReservation, changePassword, updateProfile, type ProfileState } from "./actions";
+import { cancelMyReservation, changePassword, deleteMyAccount, updateProfile, type ProfileState } from "./actions";
 
 export interface MyReservation {
   id: string;
@@ -60,6 +60,7 @@ export default function ProfileView({ me, reservations, hasPassword }: Props) {
   const copy = t.profile;
   const [details, saveDetails] = useActionState(updateProfile, INITIAL);
   const [password, savePassword] = useActionState(changePassword, INITIAL);
+  const [deleteError, deleteAccount] = useActionState(deleteMyAccount, null);
 
   const formatDate = (date: string) =>
     new Date(`${date}T12:00:00Z`).toLocaleDateString(locale === "en" ? "en-GB" : "de-DE", {
@@ -204,6 +205,40 @@ export default function ProfileView({ me, reservations, hasPassword }: Props) {
           </section>
         </div>
       </div>
+
+      <section className={`mt-6 ${CARD}`}>
+        <div className={`${CORE} grid grid-cols-1 gap-8 md:grid-cols-2`}>
+          <div>
+            <h2 className="display text-3xl text-foam">{copy.dataTitle}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-mist">{copy.dataBody}</p>
+            <a
+              href="/api/profile/export"
+              className="label mt-6 inline-block rounded-full px-6 py-3.5 text-foam ring-1 ring-inset ring-foam/25 transition-colors duration-500 ease-drift hover:bg-foam hover:text-abyss"
+            >
+              {copy.download}
+            </a>
+            <p className="mt-6 text-sm">
+              <Link href="/datenschutz" className="text-mist underline underline-offset-4 hover:text-foam">
+                {copy.privacy}
+              </Link>
+            </p>
+          </div>
+          <form action={deleteAccount} className="flex flex-col gap-4">
+            <h2 className="display text-3xl text-foam">{copy.deleteTitle}</h2>
+            <p className="text-sm leading-relaxed text-mist">{copy.deleteBody}</p>
+            <label className="flex flex-col gap-2">
+              <span className="label text-foam">{copy.deleteConfirm}</span>
+              <input name="confirm" type="email" required autoComplete="off" placeholder={me.email} className={INPUT} />
+            </label>
+            {deleteError && <p role="alert" className="text-sm text-buoy">{copy.deleteErrors[deleteError]}</p>}
+            <div>
+              <Button variant="ghost" confirm={copy.deleteButton + "?"}>
+                {copy.deleteButton}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </section>
 
       <Link href="/" className="mt-10 inline-block text-sm text-mist transition-colors hover:text-foam">
         {copy.back}

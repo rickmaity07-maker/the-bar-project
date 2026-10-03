@@ -41,6 +41,15 @@ export default async function globalSetup() {
   const [{ count }] = (await sql`select count(*)::int as count from menu_items`) as { count: number }[];
   if (count === 0) throw new Error("The test branch has no menu. Branch it from the live database (e2e/README.md).");
 
+  // On this branch only: the test owner must be the only owner, so the last-owner rules can be checked.
+  await sql`update users set role = 'user' where email not like '%@bar-05.test'`;
+
+  // A booking well past the retention period, for the clean-up check.
+  await sql`
+    insert into reservations (name, phone, email, date, time, guests, status)
+    values ('Alte Reservierung', '0000 000000', '', current_date - interval '400 days', '20:00', 2, 'confirmed')
+  `;
+
   const owner = { email: "e2e-owner@bar-05.test", password: randomBytes(12).toString("base64url") };
   const salt = randomBytes(16).toString("hex");
   const hash = `scrypt$${salt}$${scryptSync(owner.password, salt, 64).toString("hex")}`;

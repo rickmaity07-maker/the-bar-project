@@ -2,21 +2,24 @@
   Language-independent data: photos, prices, times and links.
   Every piece of visible text lives in lib/i18n.ts and is matched to this data by index.
 */
-const unsplash = (id: string, w = 1400) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80`;
+/*
+  Photos (originally from Unsplash) are served from /public/photos, so visitors'
+  browsers never contact a third party. next/image resizes them per screen.
+*/
+const photo = (id: string) => `/photos/${id.replace(/^photo-/, "")}.jpg`;
 
 export const PHOTOS = {
-  pour: unsplash("photo-1470337458703-46ad1756a187"),
-  barFloor: unsplash("photo-1711429526427-679eb0b2f156"),
-  pendantLamps: unsplash("photo-1572299448190-d7a84f6e6bc9"),
-  redChairs: unsplash("photo-1592494804071-faea15d93a8a"),
-  emptyRoom: unsplash("photo-1552566626-2d907dab0dff"),
-  eatery: unsplash("photo-1570560258879-af7f8e1447ac"),
-  terrace: unsplash("photo-1621275471769-e6aa344546d5"),
-  drinksTable: unsplash("photo-1702725365144-6e8584ea54e4"),
-  chairsTables: unsplash("photo-1582417746333-30354bba843e"),
-  fireplace: unsplash("photo-1679419857738-f8a7ca8c5de5"),
-  whiskeyOrange: unsplash("photo-1571104508999-893933ded431"),
+  pour: photo("photo-1470337458703-46ad1756a187"),
+  barFloor: photo("photo-1711429526427-679eb0b2f156"),
+  pendantLamps: photo("photo-1572299448190-d7a84f6e6bc9"),
+  redChairs: photo("photo-1592494804071-faea15d93a8a"),
+  emptyRoom: photo("photo-1552566626-2d907dab0dff"),
+  eatery: photo("photo-1570560258879-af7f8e1447ac"),
+  terrace: photo("photo-1621275471769-e6aa344546d5"),
+  drinksTable: photo("photo-1702725365144-6e8584ea54e4"),
+  chairsTables: photo("photo-1582417746333-30354bba843e"),
+  fireplace: photo("photo-1679419857738-f8a7ca8c5de5"),
+  whiskeyOrange: photo("photo-1571104508999-893933ded431"),
 } as const;
 
 /* Order matches t.nav.links. */
@@ -29,7 +32,7 @@ export const VENUE = {
   maps: "https://www.google.com/maps/search/?api=1&query=Kornmarkt+7%2C+97421+Schweinfurt",
 } as const;
 
-const drink = (id: string) => unsplash(`photo-${id}`, 480);
+const drink = (id: string) => photo(id);
 
 const COCKTAIL = [
   drink("1536935338788-846bb9981813"),
@@ -90,9 +93,9 @@ export const POURS = [
 
 /* Order matches t.day.beats. */
 export const DAY_BEATS = [
-  { time: "18:00", image: unsplash("photo-1470337458703-46ad1756a187", 900) },
-  { time: "00:00", image: unsplash("photo-1514362545857-3bc16c4c7d1b", 900) },
-  { time: "03:00", image: unsplash("photo-1572299448190-d7a84f6e6bc9", 900) },
+  { time: "18:00", image: photo("photo-1470337458703-46ad1756a187") },
+  { time: "00:00", image: photo("photo-1514362545857-3bc16c4c7d1b") },
+  { time: "03:00", image: photo("photo-1572299448190-d7a84f6e6bc9") },
 ] as const;
 
 /* Order matches t.nights.items. */
