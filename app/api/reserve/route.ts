@@ -1,11 +1,18 @@
 import { after } from "next/server";
+import { getSession } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 import { notifyNewReservation } from "@/lib/mailer";
 import { validateReservation, type ReservationInput } from "@/lib/reservation";
 import { getSiteData } from "@/lib/site-data";
 
-/* Validates a reservation request, stores it as "pending" and emails the bar about it. */
+/*
+  Validates a reservation request, stores it as "pending" under the signed-in
+  account and emails the bar about it. Booking needs an account.
+*/
 export async function POST(request: Request) {
+  const account = await getSession();
+  if (!account) return Response.json({ ok: false, message: "Sign in to book." }, { status: 401 });
+
   let body: Partial<Record<keyof ReservationInput | "locale", unknown>>;
   try {
     body = await request.json();
@@ -25,7 +32,8 @@ export async function POST(request: Request) {
     // The private-event fields are ignored for an ordinary table.
     occasion: isPrivate ? text(body.occasion) : "",
     endTime: isPrivate ? text(body.endTime) : "",
-    email: isPrivate ? text(body.email) : "",
+    // Private events can name a different contact address; tables use the account's.
+    email: isPrivate ? text(body.email) : account.email,
     message: isPrivate ? text(body.message) : "",
   };
 
@@ -40,13 +48,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    await db()`
+    const sql = db();
+    await sql`
       insert into reservations
-        (name, phone, email, date, time, end_time, guests, is_private, occasion, message, locale)
+        (user_id, name, phone, email, date, time, end_time, guests, is_private, occasion, message, locale)
       values
-        (${input.name}, ${input.phone}, ${input.email}, ${input.date}, ${input.time},
+        (${account.id}, ${input.name}, ${input.phone}, ${input.email}, ${input.date}, ${input.time},
          ${input.endTime || null}, ${Number(input.guests)}, ${isPrivate}, ${input.occasion},
          ${input.message}, ${body.locale === "en" ? "en" : "de"})
+    `;
+    // The first booking fills in the profile, so the next form is already complete.
+    await sql`
+      update users set
+        phone = case when phone = '' then ${input.phone} else phone end,
+        name = case when name = '' then ${input.name} else name end
+      where id = ${account.id}
     `;
   } catch (error) {
     console.error("Reservation could not be stored:", error);

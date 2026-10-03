@@ -97,3 +97,11 @@ create table if not exists activity_log (
   detail text not null default ''
 );
 create index if not exists activity_log_at_idx on activity_log (at desc);
+
+-- Accounts book their own tables: a phone number on the profile and the booking's owner.
+alter table users add column if not exists phone text not null default '';
+alter table reservations add column if not exists user_id uuid references users (id) on delete set null;
+create index if not exists reservations_user_idx on reservations (user_id);
+
+-- Google sign-in: the Google account id; password_hash is '' for accounts that only use Google.
+alter table users add column if not exists google_sub text unique;

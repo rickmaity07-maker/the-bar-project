@@ -10,10 +10,12 @@ interface UserRow {
   id: string;
   email: string;
   name: string;
+  phone: string;
   role: "user" | "owner";
   active: boolean;
   created_at: string;
   last_login_at: string | null;
+  bookings: number;
 }
 
 const NOTICES: Record<string, { text: string; tone: "info" | "warn" }> = {
@@ -34,7 +36,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Params
   const { notice } = await searchParams;
   const message = typeof notice === "string" ? NOTICES[notice] : undefined;
   const users = (await db()`
-    select id, email, name, role, active, created_at, last_login_at
+    select id, email, name, phone, role, active, created_at, last_login_at,
+      (select count(*)::int from reservations r where r.user_id = users.id) as bookings
     from users order by role desc, active desc, email
   `) as UserRow[];
 
@@ -45,8 +48,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Params
       </PageTitle>
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
       <Notice>
-        Alle melden sich auf derselben Seite an (/login). Nur Konten mit der Rolle „Inhaber“ sehen die Verwaltung;
-        neu registrierte Konten sind zunächst „Nutzer“ ohne Zugriff.
+        Alle melden sich auf derselben Seite an (/login). Gäste brauchen ein Konto, um zu reservieren, und sehen ihre
+        Reservierungen im Profil. Nur Konten mit der Rolle „Inhaber“ sehen die Verwaltung.
       </Notice>
 
       <div className="flex flex-col gap-4">
@@ -58,8 +61,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Params
                 <div className="min-w-0">
                   <p className="display break-all text-2xl text-foam">{user.email}</p>
                   <p className="mt-1 text-sm text-mist">
-                    {user.name || "Ohne Namen"} · angelegt {formatStamp(user.created_at)} · zuletzt angemeldet{" "}
-                    {user.last_login_at ? formatStamp(user.last_login_at) : "nie"}
+                    {user.name || "Ohne Namen"}
+                    {user.phone && ` · ${user.phone}`} · {user.bookings}{" "}
+                    {user.bookings === 1 ? "Reservierung" : "Reservierungen"} · angelegt {formatStamp(user.created_at)} ·
+                    zuletzt angemeldet {user.last_login_at ? formatStamp(user.last_login_at) : "nie"}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

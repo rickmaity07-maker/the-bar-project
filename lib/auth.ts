@@ -17,6 +17,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
+  phone: string;
   role: Role;
 }
 
@@ -68,13 +69,32 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const rows = await db()`
-    select u.id, u.email, u.name, u.role
+    select u.id, u.email, u.name, u.phone, u.role
     from sessions s
     join users u on u.id = s.user_id
     where s.token_hash = ${hashToken(token)} and s.expires_at > now() and u.active
   `;
   return (rows[0] as SessionUser | undefined) ?? null;
 });
+
+/* Signs the account out on every other device, keeping this browser's session. */
+export async function revokeOtherSessions(userId: string) {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
+  await db()`delete from sessions where user_id = ${userId} and token_hash <> ${hashToken(token)}`;
+}
+
+/* Only paths on this site, so a crafted link cannot send someone elsewhere after login. */
+export function safeNext(value: unknown) {
+  const next = typeof value === "string" ? value : "";
+  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "";
+}
+
+/* Any signed-in account: the profile page and its actions. */
+export async function requireUser(next = "/profile"): Promise<SessionUser> {
+  const session = await getSession();
+  if (!session) redirect(`/login?next=${encodeURIComponent(next)}`);
+  return session;
+}
 
 /* Guards every admin page and every admin action. */
 export async function requireOwner(): Promise<SessionUser> {

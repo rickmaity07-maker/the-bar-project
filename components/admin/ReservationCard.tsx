@@ -19,12 +19,14 @@ export interface ReservationRow {
   locale: string;
   status: string;
   admin_note: string;
+  account_email: string | null;
 }
 
 /* The columns every reservation query selects, with dates and times as plain strings. */
 export const RESERVATION_COLUMNS = `id, created_at, name, phone, email, date::text as date,
   to_char(time, 'HH24:MI') as time, to_char(end_time, 'HH24:MI') as end_time, guests,
-  is_private, occasion, message, locale, status, admin_note`;
+  is_private, occasion, message, locale, status, admin_note,
+  (select u.email from users u where u.id = reservations.user_id) as account_email`;
 
 const NEXT_STEPS: Record<string, { status: string; label: string; variant: "solid" | "ghost" | "danger" }[]> = {
   pending: [
@@ -79,6 +81,12 @@ export default function ReservationCard({ reservation: r }: { reservation: Reser
                 {r.email}
               </a>
             </dd>
+          </div>
+        )}
+        {r.account_email && r.account_email !== r.email && (
+          <div>
+            <dt className="label text-[10px] text-mist">Konto</dt>
+            <dd className="break-all text-foam">{r.account_email}</dd>
           </div>
         )}
         {r.is_private && (

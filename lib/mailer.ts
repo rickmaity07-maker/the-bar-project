@@ -94,3 +94,43 @@ export async function notifyNewReservation(input: ReservationInput, adminUrl: st
     console.error("Booking notification email failed:", error);
   }
 }
+
+interface CancelledBooking {
+  name: string;
+  phone: string;
+  date: string;
+  time: string;
+  guests: number;
+  is_private: boolean;
+}
+
+/* Tells the bar that a guest cancelled from their profile, so the table can be given away. */
+export async function notifyCancellation(booking: CancelledBooking, accountEmail: string) {
+  if (!isMailerConfigured()) return;
+  const kind = booking.is_private ? "Private Veranstaltung" : "Reservierung";
+  const when = `${formatDate(booking.date)} ${booking.time} Uhr`;
+  const lines = [
+    `${kind} vom Gast storniert.`,
+    "",
+    `Name: ${booking.name}`,
+    `Telefon: ${booking.phone}`,
+    `Datum: ${when}`,
+    `Gäste: ${booking.guests}`,
+    `Konto: ${accountEmail}`,
+  ];
+  try {
+    await getMailer().sendMail({
+      from: `${process.env.GMAIL_FROM_NAME ?? "Bar-05"} <${process.env.GMAIL_USER}>`,
+      to: process.env.RESERVATION_NOTIFY_EMAIL,
+      replyTo: accountEmail,
+      subject: `Storniert: ${booking.name}, ${when}`,
+      text: lines.join("\n"),
+      html: `<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6">${lines
+        .map((line) => escape(line) || "&nbsp;")
+        .join("<br>")}</div>`,
+    });
+    console.info("Cancellation email sent:", booking.name, booking.date);
+  } catch (error) {
+    console.error("Cancellation email failed:", error);
+  }
+}

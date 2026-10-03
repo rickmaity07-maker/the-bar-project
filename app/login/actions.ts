@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
-import { createSession, destroySession, getSession, hashPassword, verifyPassword } from "@/lib/auth";
+import { createSession, destroySession, getSession, hashPassword, safeNext, verifyPassword } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 
 export type LoginError = "credentials" | "emailInUse" | "email" | "password" | "tooMany" | "unavailable";
@@ -23,7 +23,8 @@ interface UserRow {
   active: boolean;
 }
 
-const destination = (role: string) => (role === "owner" ? "/admin" : "/login");
+/* Owners go to the admin portal, everyone else to their profile, unless they came from somewhere. */
+const destination = (role: string, next: string) => next || (role === "owner" ? "/admin" : "/profile");
 
 /* Sign in and sign up share one form; the submit button's name picks the mode. */
 export async function authenticate(_previous: LoginState, form: FormData): Promise<LoginState> {
@@ -31,6 +32,7 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   const name = String(form.get("name") ?? "").trim().slice(0, 120);
+  const next = safeNext(form.get("next"));
 
   if (!hasDatabase()) return { error: "unavailable", email };
   if (!EMAIL.test(email)) return { error: "email", email };
@@ -71,12 +73,12 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
   await sql`delete from login_attempts where email = ${email}`;
   await sql`update users set last_login_at = now() where id = ${user.id}`;
   await createSession(user.id);
-  redirect(destination(user.role));
+  redirect(destination(user.role, next));
 }
 
 export async function signOut() {
   const session = await getSession();
   await destroySession();
   if (session) await logActivity(session, "user.signout", "user", session.id);
-  redirect("/login");
+  redirect("/");
 }

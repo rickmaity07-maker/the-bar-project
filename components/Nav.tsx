@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import ButtonLink from "@/components/ButtonLink";
 import Logo from "@/components/Logo";
+import { useAccount } from "@/lib/account";
 import { NAV_TARGETS } from "@/lib/data";
 import { LOCALES } from "@/lib/i18n";
 import { setLocale, useLanguage } from "@/lib/language";
@@ -29,6 +30,26 @@ function LanguageToggle() {
           {code}
         </button>
       ))}
+    </div>
+  );
+}
+
+/* Sign-in for guests, the profile for accounts, and the admin portal only for owners. */
+function AccountLinks({ className, linkClass }: { className: string; linkClass: string }) {
+  const { account, loading } = useAccount();
+  const { t } = useLanguage();
+  if (loading) return null;
+
+  return (
+    <div className={className}>
+      {account?.role === "owner" && (
+        <a href="/admin" className={linkClass}>
+          {t.nav.admin}
+        </a>
+      )}
+      <a href={account ? "/profile" : "/login"} className={linkClass}>
+        {account ? t.nav.account : t.nav.signIn}
+      </a>
     </div>
   );
 }
@@ -86,6 +107,10 @@ export default function Nav() {
           </ul>
 
           <div className="flex items-center gap-2">
+            <AccountLinks
+              className="hidden items-center gap-1 lg:flex"
+              linkClass="label rounded-full px-3 py-3 text-foam/75 transition-colors duration-500 ease-drift hover:text-foam"
+            />
             <LanguageToggle />
             <div className="hidden lg:block">
               <ButtonLink href="#reserve">{t.nav.reserve}</ButtonLink>
@@ -156,6 +181,11 @@ export default function Nav() {
                 </li>
               ))}
             </ul>
+
+            <AccountLinks
+              className="flex flex-wrap gap-2"
+              linkClass="label rounded-full px-5 py-3.5 text-foam ring-1 ring-inset ring-foam/25"
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-4">
               <ButtonLink href="#reserve" onClick={() => setOpen(false)}>

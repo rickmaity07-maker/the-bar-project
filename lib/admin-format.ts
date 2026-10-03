@@ -66,6 +66,8 @@ const ACTIONS: Record<string, string> = {
   "hours.closed_date.remove": "Schließtag entfernt",
   "user.signup": "Konto registriert",
   "user.signout": "Abgemeldet",
+  "user.profile": "Profil geändert",
+  "user.google_link": "Mit Google verknüpft",
   "user.create": "Nutzer angelegt",
   "user.role": "Rolle geändert",
   "user.activate": "Nutzer aktiviert",
