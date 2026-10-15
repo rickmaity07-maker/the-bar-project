@@ -70,6 +70,9 @@ export default function Footer() {
         <a href="/datenschutz" className="underline-offset-4 transition-colors hover:text-foam hover:underline">
           {t.footer.privacy}
         </a>
+        <a href="/datenschutz#cookies" className="underline-offset-4 transition-colors hover:text-foam hover:underline">
+          {t.footer.cookies}
+        </a>
       </p>
     </footer>
   );

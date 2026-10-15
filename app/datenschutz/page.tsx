@@ -9,9 +9,9 @@ export const metadata: Metadata = {
   description: "Welche Daten die Website von Bar-05 verarbeitet, wofür, wo und wie lange.",
 };
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <section className="mt-12">
+    <section id={id} className="mt-12 scroll-mt-8">
       <h2 className="display text-3xl text-foam">{title}</h2>
       <div className="mt-4 space-y-3 text-base leading-relaxed text-foam/85">{children}</div>
     </section>
@@ -158,7 +158,7 @@ export default async function PrivacyPage() {
         <p>Längere Fristen gelten nur, wenn ein Gesetz sie vorschreibt.</p>
       </Section>
 
-      <Section title="8. Cookies und lokaler Speicher">
+      <Section id="cookies" title="8. Cookies und lokaler Speicher">
         <table className="w-full text-left text-sm">
           <tbody>
             <tr>
