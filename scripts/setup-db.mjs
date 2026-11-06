@@ -35,9 +35,11 @@ if (email || password) {
     console.error("Give an email address and a password of at least 8 characters.");
     process.exit(1);
   }
-  // Must match hashPassword() in lib/auth.ts.
+  // Must match hashPassword() and SCRYPT_PARAMS in lib/auth.ts: scrypt$N$r$p$salt$hash.
+  const [N, r, p] = [2 ** 17, 8, 1];
   const salt = randomBytes(16).toString("hex");
-  const hash = `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
+  const derived = scryptSync(password, salt, 64, { N, r, p, maxmem: 256 * N * r }).toString("hex");
+  const hash = `scrypt$${N}$${r}$${p}$${salt}$${derived}`;
   await sql`
     insert into users (email, password_hash, role, active)
     values (${email.trim().toLowerCase()}, ${hash}, 'owner', true)

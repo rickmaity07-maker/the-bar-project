@@ -6,7 +6,17 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db, hasDatabase } from "@/lib/db";
 
-const scryptAsync = promisify(scrypt) as (password: string, salt: string, length: number) => Promise<Buffer>;
+interface ScryptParams {
+  N: number;
+  r: number;
+  p: number;
+}
+const scryptAsync = promisify(scrypt) as (
+  password: string,
+  salt: string,
+  length: number,
+  options: ScryptParams & { maxmem: number },
+) => Promise<Buffer>;
 
 export const SESSION_COOKIE = "session";
 const SESSION_MAX_AGE_S = 60 * 60 * 24 * 5;
@@ -21,39 +31,88 @@ export interface SessionUser {
   role: Role;
 }
 
-/* Format: scrypt$<salt hex>$<hash hex>. scripts/setup-db.mjs writes the same format. */
+/*
+  Password hashes: scrypt$<N>$<r>$<p>$<salt hex>$<hash hex>, so the cost can be
+  raised later without breaking old hashes. N = 2^17, r = 8 needs 128 MiB per
+  check (OWASP's recommended minimum); maxmem leaves room above that.
+  scripts/setup-db.mjs writes the same format.
+
+  The first version stored scrypt$<salt hex>$<hash hex> with Node's defaults
+  (N = 2^14, r = 8, p = 1). Those still verify, and a successful sign-in
+  rewrites them with the current parameters (see needsRehash).
+*/
+export const SCRYPT_PARAMS: ScryptParams = { N: 2 ** 17, r: 8, p: 1 };
+const LEGACY_PARAMS: ScryptParams = { N: 2 ** 14, r: 8, p: 1 };
+const maxmem = ({ N, r }: ScryptParams) => 256 * N * r;
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
-  const hash = await scryptAsync(password, salt, 64);
-  return `scrypt$${salt}$${hash.toString("hex")}`;
+  const { N, r, p } = SCRYPT_PARAMS;
+  const hash = await scryptAsync(password, salt, 64, { N, r, p, maxmem: maxmem(SCRYPT_PARAMS) });
+  return `scrypt$${N}$${r}$${p}$${salt}$${hash.toString("hex")}`;
 }
 
 /* Longer input only costs scrypt time; nobody types more than this. */
 export const MAX_PASSWORD_LENGTH = 256;
 
-const HASH_FORMAT = /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$/;
+const LEGACY_FORMAT = /^scrypt\$([0-9a-f]{32})\$([0-9a-f]{128})$/;
+const HASH_FORMAT = /^scrypt\$(\d{1,8})\$(\d{1,2})\$(\d{1,2})\$([0-9a-f]{32})\$([0-9a-f]{128})$/;
+
+/* Bounds keep a tampered row from asking for gigabytes of memory or an endless loop. */
+function parseHash(stored: string): { params: ScryptParams; salt: string; hash: string } | null {
+  const legacy = LEGACY_FORMAT.exec(stored);
+  if (legacy) return { params: LEGACY_PARAMS, salt: legacy[1], hash: legacy[2] };
+  const match = HASH_FORMAT.exec(stored);
+  if (!match) return null;
+  const params = { N: Number(match[1]), r: Number(match[2]), p: Number(match[3]) };
+  const powerOfTwo = (params.N & (params.N - 1)) === 0;
+  if (!powerOfTwo || params.N < 2 ** 14 || params.N > 2 ** 20 || params.r < 1 || params.r > 16 || params.p < 1 || params.p > 4) {
+    return null;
+  }
+  return { params, salt: match[4], hash: match[5] };
+}
 
 /*
   Never throws and never accepts a malformed stored value: an odd or empty hex
   string would otherwise decode to a short (even empty) buffer that a derived
-  key of the same length matches.
+  key of the same length matches. An empty or malformed hash (a Google-only
+  account) still costs one full scrypt run, so the response time does not tell
+  such accounts apart.
 */
 export async function verifyPassword(password: string, stored: string) {
-  if (!HASH_FORMAT.test(stored) || password.length > MAX_PASSWORD_LENGTH) return false;
-  const [, salt, hash] = stored.split("$");
+  const parsed = parseHash(stored);
+  if (!parsed || password.length > MAX_PASSWORD_LENGTH) {
+    await burnPasswordCheck(password);
+    return false;
+  }
   try {
-    const expected = Buffer.from(hash, "hex");
-    const actual = await scryptAsync(password, salt, expected.length);
+    const expected = Buffer.from(parsed.hash, "hex");
+    const actual = await scryptAsync(password, parsed.salt, expected.length, {
+      ...parsed.params,
+      maxmem: maxmem(parsed.params),
+    });
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   } catch {
     return false;
   }
 }
 
+/* True when a stored hash uses weaker parameters than SCRYPT_PARAMS and should be rewritten. */
+export function needsRehash(stored: string) {
+  const parsed = parseHash(stored);
+  if (!parsed) return false;
+  const { N, r, p } = parsed.params;
+  return N !== SCRYPT_PARAMS.N || r !== SCRYPT_PARAMS.r || p !== SCRYPT_PARAMS.p;
+}
+
 /* Spent on unknown emails too, so the response time does not reveal which addresses have an account. */
-const DUMMY_HASH = `scrypt$${"0".repeat(32)}$${"0".repeat(128)}`;
 export async function burnPasswordCheck(password: string) {
-  await verifyPassword(password.slice(0, MAX_PASSWORD_LENGTH), DUMMY_HASH);
+  const { N, r, p } = SCRYPT_PARAMS;
+  try {
+    await scryptAsync(password.slice(0, MAX_PASSWORD_LENGTH), "0".repeat(32), 64, { N, r, p, maxmem: maxmem(SCRYPT_PARAMS) });
+  } catch {
+    // Only the time matters.
+  }
 }
 
 /* Only a hash of the token is stored, so a leaked sessions table cannot be replayed. */
@@ -111,7 +170,6 @@ export async function revokeOtherSessions(userId: string) {
   character, whitespace or backslash is refused outright, and the result must
   still resolve to this origin.
 */
-// eslint-disable-next-line no-control-regex
 const UNSAFE_IN_PATH = /[\x00-\x20\x7f\\]/;
 export function safeNext(value: unknown) {
   const next = typeof value === "string" ? value : "";

@@ -9,6 +9,7 @@ import {
   getSession,
   hashPassword,
   MAX_PASSWORD_LENGTH,
+  needsRehash,
   safeNext,
   verifyPassword,
 } from "@/lib/auth";
@@ -81,6 +82,10 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
       return { error: "credentials", email };
     }
     user = candidate;
+    // Hashes from before the stronger scrypt settings are rewritten while the plain password is at hand.
+    if (needsRehash(candidate.password_hash)) {
+      await sql`update users set password_hash = ${await hashPassword(password)} where id = ${user.id}`;
+    }
     await logActivity({ id: user.id, email }, "user.signin", "user", user.id, "Passwort");
   }
 

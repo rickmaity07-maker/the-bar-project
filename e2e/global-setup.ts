@@ -60,6 +60,8 @@ export default async function globalSetup() {
   `;
 
   const owner = { email: "e2e-owner@bar-05.test", password: randomBytes(12).toString("base64url") };
+  // Deliberately the old three-part format (Node's default N = 2^14): the owner's first
+  // sign-in proves old hashes still verify, and lib/auth.ts rewrites it with the current settings.
   const salt = randomBytes(16).toString("hex");
   const hash = `scrypt$${salt}$${scryptSync(owner.password, salt, 64).toString("hex")}`;
   await sql`
