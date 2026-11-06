@@ -19,6 +19,17 @@
 
 const dev = process.env.NODE_ENV === "development";
 
+/*
+  upgrade-insecure-requests makes the browser fetch any stray http:// link on
+  the page over https. Only for the production deployment on Vercel, which is
+  always served over HTTPS (VERCEL is set during the build there, which is when
+  next.config.ts reads this, and at run time for proxy.ts). A production build
+  served over plain http (next start on localhost, the e2e suite) would
+  otherwise have its own scripts and styles upgraded to an https:// that is
+  not there.
+*/
+const upgradeInsecure = process.env.NODE_ENV === "production" && Boolean(process.env.VERCEL);
+
 export function contentSecurityPolicy(nonce?: string) {
   const script = nonce
     ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
@@ -38,5 +49,6 @@ export function contentSecurityPolicy(nonce?: string) {
     "base-uri 'self'",
     "form-action 'self' https://accounts.google.com",
     "frame-ancestors 'none'",
+    ...(upgradeInsecure ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 }
