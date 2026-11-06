@@ -339,6 +339,7 @@ const de = {
       email: "Bitte gebt eine gültige E-Mail-Adresse an.",
       password: "Das Passwort braucht mindestens 8 Zeichen.",
       tooMany: "Zu viele Versuche. Bitte in 15 Minuten noch einmal probieren.",
+      tooManySignups: "Von hier wurden gerade zu viele Konten angelegt. Bitte in einer Stunde noch einmal probieren.",
       unavailable: "Die Anmeldung ist gerade nicht verfügbar.",
       google: "Die Anmeldung mit Google hat nicht geklappt. Bitte noch einmal versuchen.",
       googleLink:
@@ -742,6 +743,7 @@ const en: Dict = {
       email: "Please enter a valid email address.",
       password: "The password needs at least 8 characters.",
       tooMany: "Too many attempts. Please try again in 15 minutes.",
+      tooManySignups: "Too many accounts were created from here just now. Please try again in an hour.",
       unavailable: "Sign-in is not available right now.",
       google: "Signing in with Google did not work. Please try again.",
       googleLink:

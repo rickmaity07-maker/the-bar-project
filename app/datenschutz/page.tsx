@@ -85,8 +85,8 @@ export default async function PrivacyPage() {
         </p>
         <p>
           Zum Schutz vor dem Erraten von Passwörtern und vor massenhaften Fake-Reservierungen zählen wir
-          fehlgeschlagene Anmeldeversuche je E-Mail-Adresse und je IP-Adresse sowie Reservierungsanfragen je Konto
-          und je IP-Adresse. Die IP-Adresse speichern wir dabei nur als verschlüsselten Prüfwert (HMAC), nicht im
+          fehlgeschlagene Anmeldeversuche je E-Mail-Adresse und je IP-Adresse, Registrierungen je IP-Adresse
+          (höchstens fünf pro Stunde) sowie Reservierungsanfragen je Konto und je IP-Adresse. Die IP-Adresse speichern wir dabei nur als verschlüsselten Prüfwert (HMAC), nicht im
           Klartext. Nach acht Fehlversuchen für eine E-Mail-Adresse von derselben IP-Adresse oder 30 von einer
           IP-Adresse sperren wir die Anmeldung von dort für 15 Minuten (Art. 6 Abs. 1 lit. f DSGVO).
         </p>

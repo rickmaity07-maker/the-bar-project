@@ -15,9 +15,19 @@ import {
 } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 import { clearLoginFailures, isLoginBlocked, recordLoginFailure } from "@/lib/login-throttle";
-import { requestIpKey } from "@/lib/security";
+import { overLimit, requestIpKey } from "@/lib/security";
 
-export type LoginError = "credentials" | "emailInUse" | "email" | "password" | "tooMany" | "unavailable";
+export type LoginError =
+  | "credentials"
+  | "emailInUse"
+  | "email"
+  | "password"
+  | "tooMany"
+  | "tooManySignups"
+  | "unavailable";
+
+/* Account sign-ups per IP address: plenty for a household, too few for a bot. */
+const SIGNUP_LIMIT = { perIp: 5, windowSeconds: 60 * 60 };
 export interface LoginState {
   error: LoginError | null;
   email: string;
@@ -56,6 +66,10 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
 
   if (mode === "signup") {
     if (password.length < 8 || password.length > MAX_PASSWORD_LENGTH) return { error: "password", email };
+    // Checked before scrypt runs, so a flood of sign-ups can neither fill the users table nor burn CPU and memory.
+    if (await overLimit("signup:ip", ip, SIGNUP_LIMIT.perIp, SIGNUP_LIMIT.windowSeconds)) {
+      return { error: "tooManySignups", email };
+    }
     const created = (await sql`
       insert into users (email, name, password_hash)
       values (${email}, ${name}, ${await hashPassword(password)})
