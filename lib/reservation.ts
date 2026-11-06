@@ -45,23 +45,39 @@ export const MAX_TABLE_GUESTS = 12;
 export const MAX_PRIVATE_GUESTS = 500;
 export const MAX_MESSAGE_LENGTH = 1000;
 
-const TIME = /^\d{2}:\d{2}$/;
+export const MAX_NAME_LENGTH = 120;
+export const MAX_PHONE_LENGTH = 40;
+export const MAX_EMAIL_LENGTH = 200;
+
+/* A real clock time, so the database never sees "25:99". */
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* YYYY-MM-DD that names a real day (no 31 February). */
+function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
 /* Shared by the form and the API route so both agree on what a valid request is. */
 export function validateReservation(input: ReservationInput, schedule: Schedule): ReservationErrors {
   const errors: ReservationErrors = {};
 
-  if (input.name.trim().length < 2) errors.name = "name";
+  if (input.name.trim().length < 2 || input.name.length > MAX_NAME_LENGTH) errors.name = "name";
 
-  if (input.phone.replace(/\D/g, "").length < 6) errors.phone = "phone";
+  if (input.phone.replace(/\D/g, "").length < 6 || input.phone.length > MAX_PHONE_LENGTH) errors.phone = "phone";
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(`${input.date}T00:00:00`))) {
+  if (!isCalendarDate(input.date)) {
     errors.date = "date";
   } else {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (new Date(`${input.date}T00:00:00`) < today) errors.date = "datePast";
+    const day = new Date(`${input.date}T00:00:00`);
+    const latest = new Date(today);
+    latest.setFullYear(latest.getFullYear() + 2);
+    if (day < today) errors.date = "datePast";
+    else if (day > latest) errors.date = "date";
     else if (isClosedOn(input.date, schedule.week, schedule.closedDates)) errors.date = "closed";
   }
 
@@ -76,7 +92,7 @@ export function validateReservation(input: ReservationInput, schedule: Schedule)
   if (input.isPrivate) {
     if (!(OCCASIONS as readonly string[]).includes(input.occasion)) errors.occasion = "occasion";
     if (!TIME.test(input.endTime)) errors.endTime = "endTime";
-    if (!EMAIL.test(input.email.trim())) errors.email = "email";
+    if (!EMAIL.test(input.email.trim()) || input.email.length > MAX_EMAIL_LENGTH) errors.email = "email";
     if (input.message.length > MAX_MESSAGE_LENGTH) errors.message = "message";
   }
 
