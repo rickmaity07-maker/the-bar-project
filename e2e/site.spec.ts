@@ -208,7 +208,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok: t.includes("Erst anmelden") && !(await page.locator("#name").count()), extra: t.slice(-120).replace(/\s+/g, " ") };
   });
   await check("Signed out: booking API answers 401", async () => {
-    const r = await fetch(`${BASE}/api/reserve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Anon", phone: "0171 0000000", date: "2026-10-07", time: "19:00", guests: "2" }) });
+    const r = await fetch(`${BASE}/api/reserve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Anon", phone: "0171 0000000", date: "2027-10-06", time: "19:00", guests: "2" }) });
     return { ok: r.status === 401, extra: r.status };
   });
   await check("'Konto erstellen' opens sign-up with a note about the booking", async () => {
@@ -254,14 +254,14 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return (await page.locator("#date-error").innerText()).includes("Vergangenheit");
   });
   await check("Monday rejected as closed", async () => {
-    await page.fill("#date", "2026-10-12");
+    await page.fill("#date", "2027-10-11");
     await page.getByRole("button", { name: "Tisch anfragen" }).click();
     return (await page.locator("#date-error").innerText()).includes("geschlossen");
   });
   await check("Table booking for 4 succeeds", async () => {
     await page.fill("#name", `Anna Tisch ${TAG}`);
     await page.fill("#phone", "0171 1111111");
-    await page.fill("#date", "2026-10-07");
+    await page.fill("#date", "2027-10-06");
     await page.fill("#time", "19:30");
     await page.selectOption("#guests", "4");
     await page.getByRole("button", { name: "Tisch anfragen" }).click();
@@ -281,7 +281,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   await check("Private form validates occasion, end time, email and guest count", async () => {
     await page.fill("#name", `Ben Event ${TAG}`);
     await page.fill("#phone", "0171 2222222");
-    await page.fill("#date", "2026-10-10");
+    await page.fill("#date", "2027-10-09");
     await page.fill("#time", "19:00");
     await page.fill("#guests", "600");
     await page.fill("#email", "kein-email");
@@ -310,7 +310,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     await settle(page, 600);
     await page.fill("#name", `Chris English ${TAG}`);
     await page.fill("#phone", "0171 3333333");
-    await page.fill("#date", "2026-10-08");
+    await page.fill("#date", "2027-10-07");
     await page.fill("#time", "21:00");
     await page.getByRole("button", { name: "Request this table" }).click();
     await page.getByText("Request received.").waitFor({ timeout: 20000 });
@@ -326,20 +326,20 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
       .then(async (r) => ({ status: r.status(), json: await r.json().catch(() => null) }));
   await check("Broken JSON gets 400", async () => ({ ok: (await api(null, "{nope")).status === 400 }));
   await check("Invalid booking gets 422 with field codes", async () => {
-    const r = await api({ name: "x", phone: "1", date: "2026-10-12", time: "7pm", guests: "40" });
+    const r = await api({ name: "x", phone: "1", date: "2027-10-11", time: "7pm", guests: "40" });
     const codes = r.json?.errors ?? {};
     return { ok: r.status === 422 && codes.name && codes.phone && codes.date === "closed" && codes.time && codes.guests, extra: JSON.stringify(codes) };
   });
   await check("Over-long private message rejected", async () => {
-    const r = await api({ name: "Lang", phone: "0171 4444444", date: "2026-10-10", time: "19:00", guests: "30", isPrivate: true, occasion: "other", endTime: "01:00", email: "a@b.de", message: "x".repeat(1001) });
+    const r = await api({ name: "Lang", phone: "0171 4444444", date: "2027-10-09", time: "19:00", guests: "30", isPrivate: true, occasion: "other", endTime: "01:00", email: "a@b.de", message: "x".repeat(1001) });
     return { ok: r.status === 422 && r.json.errors.message === "message", extra: JSON.stringify(r.json?.errors) };
   });
   await check("Event fields are ignored on a normal table booking", async () => {
-    const r = await api({ name: `Dora Direkt ${TAG}`, phone: "0171 5555555", date: "2026-10-09", time: "18:30", guests: "3", isPrivate: false, occasion: "wedding", email: "dora@example.com", message: "soll ignoriert werden" });
+    const r = await api({ name: `Dora Direkt ${TAG}`, phone: "0171 5555555", date: "2027-10-08", time: "18:30", guests: "3", isPrivate: false, occasion: "wedding", email: "dora@example.com", message: "soll ignoriert werden" });
     return { ok: r.status === 200 && r.json.ok, extra: r.status };
   });
   await check("GET on the booking endpoint is refused", async () => ({ ok: (await fetch(`${BASE}/api/reserve`)).status === 405 }));
-  const valid = { name: "Quer Seite", phone: "0171 6666666", date: "2026-10-09", time: "19:00", guests: "2" };
+  const valid = { name: "Quer Seite", phone: "0171 6666666", date: "2027-10-08", time: "19:00", guests: "2" };
   await check("Cross-site booking requests are refused, even with the session cookie", async () => {
     const r = await page.request.post(`${BASE}/api/reserve`, {
       headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
@@ -367,7 +367,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   /* ================= PROFILE ================= */
   section = "Profile";
   await check("Profile lists the guest's 5 bookings", async () => {
-    await api({ name: `Storno Test ${TAG}`, phone: "0171 9999999", date: "2026-10-15", time: "20:00", guests: "2" });
+    await api({ name: `Storno Test ${TAG}`, phone: "0171 9999999", date: "2027-10-14", time: "20:00", guests: "2" });
     await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
     const t = await page.locator("main").innerText();
     const items = await page.locator("main li").count();
@@ -378,11 +378,11 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     extra: await page.locator('input[name="phone"]').inputValue(),
   }));
   await check("Guest cancels their own booking", async () => {
-    const item = page.locator("main li", { hasText: "15. Oktober 2026" });
+    const item = page.locator("main li", { hasText: "14. Oktober 2027" });
     await item.getByRole("button", { name: "Stornieren" }).click();
     await settle(page, 2500);
-    const t = await page.locator("main li", { hasText: "15. Oktober 2026" }).innerText();
-    return { ok: t.includes("STORNIERT") && !(await page.locator("main li", { hasText: "15. Oktober 2026" }).getByRole("button", { name: "Stornieren" }).count()), extra: t.replace(/\s+/g, " ") };
+    const t = await page.locator("main li", { hasText: "14. Oktober 2027" }).innerText();
+    return { ok: t.includes("STORNIERT") && !(await page.locator("main li", { hasText: "14. Oktober 2027" }).getByRole("button", { name: "Stornieren" }).count()), extra: t.replace(/\s+/g, " ") };
   });
   await check("Changing name and phone", async () => {
     await page.locator('input[name="name"]').fill("Gast Geändert");
@@ -691,7 +691,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     await settle(admin);
     await page.goto(BASE, { waitUntil: "networkidle" });
     const t = (await page.locator("#visit dl").innerText()).replace(/\s+/g, " ");
-    const r = await api({ name: `Erika Dienstag ${TAG}`, phone: "0171 6666666", date: "2026-10-13", time: "18:00", guests: "2" });
+    const r = await api({ name: `Erika Dienstag ${TAG}`, phone: "0171 6666666", date: "2027-10-12", time: "18:00", guests: "2" });
     return { ok: /DIENSTAG 17:00 bis 23:00/i.test(t) && r.status === 200, extra: `${t} | api ${r.status}` };
   });
   await check("Closing Tuesday again blocks bookings", async () => {
@@ -700,28 +700,28 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     await admin.locator('input[name="closes_2"]').fill("00:00");
     await admin.getByRole("button", { name: "Wochenplan speichern" }).click();
     await settle(admin);
-    const r = await api({ name: `Erika Dienstag ${TAG}`, phone: "0171 6666666", date: "2026-10-20", time: "18:00", guests: "2" });
+    const r = await api({ name: `Erika Dienstag ${TAG}`, phone: "0171 6666666", date: "2027-10-19", time: "18:00", guests: "2" });
     return { ok: r.status === 422 && r.json.errors.date === "closed", extra: r.status };
   });
   await check("One-off closed day blocks bookings, removing it allows them", async () => {
-    await admin.fill('input[name="date"]', "2026-10-16");
+    await admin.fill('input[name="date"]', "2027-10-15");
     await admin.fill('input[name="reason"]', "Betriebsausflug");
     await admin.getByRole("button", { name: "Eintragen" }).click();
     await admin.getByText("Betriebsausflug").waitFor({ timeout: 15000 });
-    const blocked = await api({ name: "Fritz Freitag", phone: "0171 7777777", date: "2026-10-16", time: "20:00", guests: "2" });
+    const blocked = await api({ name: "Fritz Freitag", phone: "0171 7777777", date: "2027-10-15", time: "20:00", guests: "2" });
     await admin.locator("li", { hasText: "Betriebsausflug" }).getByRole("button", { name: "Entfernen" }).click();
     await settle(admin);
     const gone = !(await admin.getByText("Betriebsausflug").count());
     return { ok: blocked.status === 422 && blocked.json.errors.date === "closed" && gone, extra: `blocked=${blocked.status} removed=${gone}` };
   });
   await check("Closed day also blocks in the browser form", async () => {
-    await admin.fill('input[name="date"]', "2026-10-23");
+    await admin.fill('input[name="date"]', "2027-10-22");
     await admin.getByRole("button", { name: "Eintragen" }).click();
     await settle(admin);
     await form();
     await page.fill("#name", "Gina Form");
     await page.fill("#phone", "0171 8888888");
-    await page.fill("#date", "2026-10-23");
+    await page.fill("#date", "2027-10-22");
     await page.fill("#time", "20:00");
     await page.getByRole("button", { name: "Tisch anfragen" }).click();
     const msg = await page.locator("#date-error").innerText();
@@ -960,9 +960,9 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok, extra: `${r.status()} ${body.split("\r\n").length - 2} rows, anon ${anon.status}` };
   });
   await check("Reservations list has date filters and a total", async () => {
-    await admin.goto(`${BASE}/admin/reservations?when=all&from=2026-10-01&to=2026-10-31`);
+    await admin.goto(`${BASE}/admin/reservations?when=all&from=2027-09-30&to=2027-10-30`);
     const header = await admin.locator("main header").innerText();
-    return { ok: /\d+ Treffer/.test(header) && (await admin.locator('input[name="from"]').inputValue()) === "2026-10-01", extra: header };
+    return { ok: /\d+ Treffer/.test(header) && (await admin.locator('input[name="from"]').inputValue()) === "2027-09-30", extra: header };
   });
 
   /* ================= ADMIN: ACTIVITY ================= */
