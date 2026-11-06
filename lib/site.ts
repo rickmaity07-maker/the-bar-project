@@ -92,14 +92,58 @@ export const DEFAULT_WEEK: DayHours[] = [
   UNTIL_THREE,
 ];
 
-/* Older menu rows stored Unsplash addresses; they point at the same photo hosted here. */
-export function localPhoto(url: string) {
+/* Only photos shipped in /public/photos may appear on the site; the admin forms check against the same pattern. */
+export const LOCAL_PHOTO = /^\/photos\/[\w-]+\.jpg$/;
+
+/*
+  Older menu rows stored Unsplash addresses; they point at the same photo hosted
+  here. Anything else that is not one of our own photos is replaced by the
+  fallback, so a bad database value can never become an image source.
+*/
+export function localPhoto(url: string): string {
   const id = url.match(/photo-(\d+-[0-9a-f]+)/)?.[1];
-  return url.startsWith("https://images.unsplash.com/") && id ? `/photos/${id}.jpg` : url;
+  if (url.startsWith("https://images.unsplash.com/") && id) return `/photos/${id}.jpg`;
+  return LOCAL_PHOTO.test(url) ? url : FALLBACK_DRINK_IMAGE;
 }
 
 /* Shown for drinks added in the portal, which have no photo of their own. */
 export const FALLBACK_DRINK_IMAGE = POURS[0][0].image;
+
+/*
+  The "route" link in the visit section. Only https links to the big map
+  services are allowed, so the owner's form (or a bad row) cannot place a
+  javascript: or look-alike link on the homepage.
+*/
+const MAP_HOSTS = [
+  "google.com",
+  "www.google.com",
+  "maps.google.com",
+  "google.de",
+  "www.google.de",
+  "maps.google.de",
+  "goo.gl",
+  "maps.app.goo.gl",
+  "g.page",
+  "openstreetmap.org",
+  "www.openstreetmap.org",
+  "osm.org",
+  "maps.apple.com",
+  "www.bing.com",
+];
+
+export function isSafeMapsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+    if (!MAP_HOSTS.includes(url.hostname)) return false;
+    // On the general Google and Bing hosts only their map pages.
+    if (/^(www\.)?google\.(com|de)$/.test(url.hostname) && !url.pathname.startsWith("/maps")) return false;
+    if (url.hostname === "www.bing.com" && !url.pathname.startsWith("/maps")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function defaultMenu(): MenuCategory[] {
   return content.de.menu.categories.map((category, c) => ({

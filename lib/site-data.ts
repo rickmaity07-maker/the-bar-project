@@ -4,6 +4,7 @@ import {
   DEFAULT_SITE_DATA,
   DEFAULT_WEEK,
   FALLBACK_DRINK_IMAGE,
+  isSafeMapsUrl,
   localPhoto,
   phoneHref,
   type ClosedDate,
@@ -108,7 +109,8 @@ export async function getSiteData(): Promise<SiteData> {
           postalCity: v.postal_city,
           phone: v.phone,
           phoneHref: phoneHref(v.phone),
-          mapsUrl: v.maps_url,
+          // A link that is not one of the allowed map services falls back to the built-in one.
+          mapsUrl: isSafeMapsUrl(v.maps_url) ? v.maps_url : DEFAULT_SITE_DATA.venue.mapsUrl,
         }
       : DEFAULT_SITE_DATA.venue;
 

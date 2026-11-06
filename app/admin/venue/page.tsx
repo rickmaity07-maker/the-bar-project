@@ -14,13 +14,26 @@ function Field({ label, name, value, required, type = "text" }: { label: string;
   );
 }
 
-export default async function VenuePage() {
+const NOTICES: Record<string, { text: string; tone: "info" | "warn" }> = {
+  saved: { text: "Gespeichert.", tone: "info" },
+  invalid: { text: "Name, Straße, Ort und eine Telefonnummer mit mindestens 6 Ziffern sind Pflicht.", tone: "warn" },
+  maps: {
+    text: "Der Kartenlink muss mit https:// beginnen und zu Google Maps, OpenStreetMap, Apple Karten oder Bing Maps führen.",
+    tone: "warn",
+  },
+};
+
+type Params = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function VenuePage({ searchParams }: { searchParams: Params }) {
   await requireOwner();
-  const { venue } = await getSiteData();
+  const [{ venue }, { notice }] = await Promise.all([getSiteData(), searchParams]);
+  const message = typeof notice === "string" ? NOTICES[notice] : undefined;
 
   return (
     <>
       <PageTitle title="Bar & Kontakt" />
+      {message && <Notice tone={message.tone}>{message.text}</Notice>}
       <Notice>
         Diese Angaben stehen in der Fußzeile, im Bereich „Besuch“, bei der Reservierung, in der Datenschutzerklärung und
         in allen E-Mails an Gäste. Änderungen erscheinen sofort.

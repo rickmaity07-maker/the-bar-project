@@ -5,23 +5,31 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
-import { hashPassword, requireOwner } from "@/lib/auth";
+import { hashPassword, MAX_PASSWORD_LENGTH, requireOwner, revokeOtherSessions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifyGuest, type GuestBooking, type GuestMailKind } from "@/lib/guest-mail";
+import { isUuid, siteOrigin } from "@/lib/security";
 import { defaultMenu, FALLBACK_DRINK_IMAGE } from "@/lib/site";
 
 /*
   Every action re-checks the session itself: server actions can be called with a
-  plain POST, so the page guard alone is not enough.
+  plain POST, so the page guard alone is not enough. Ids are checked as UUIDs
+  before they reach a query, so a tampered form fails quietly instead of with a
+  database error.
 */
 
-const TIME = /^\d{2}:\d{2}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUSES = ["pending", "confirmed", "declined", "cancelled"] as const;
+const DIRECTIONS = ["up", "down"];
 
 const text = (form: FormData, key: string, max = 500) => String(form.get(key) ?? "").trim().slice(0, max);
 const checked = (form: FormData, key: string) => form.get(key) === "on";
+const uuid = (form: FormData, key = "id") => {
+  const value = text(form, key, 40);
+  return isUuid(value) ? value : null;
+};
 
 /* Refreshes every admin page and, when the visible site changed, the homepage too. */
 function refresh({ site = false } = {}) {
@@ -33,12 +41,13 @@ function refresh({ site = false } = {}) {
 
 export async function setReservationStatus(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
   const status = text(form, "status") as (typeof STATUSES)[number];
-  if (!STATUSES.includes(status)) return;
+  if (!id || !STATUSES.includes(status)) return;
 
   const sql = db();
   const [before] = (await sql`select status from reservations where id = ${id}`) as { status: string }[];
+  if (!before) return;
   const rows = (await sql`
     update reservations set status = ${status}, updated_at = now(), updated_by = ${me.id}
     where id = ${id}
@@ -46,14 +55,17 @@ export async function setReservationStatus(form: FormData) {
       to_char(end_time, 'HH24:MI') as end_time, guests, is_private, locale
   `) as GuestBooking[];
   const booking = rows[0];
-  if (booking) await logActivity(me, `reservation.${status}`, "reservation", id, `${booking.name}, ${booking.date}`);
+  if (booking && before.status !== status) {
+    await logActivity(me, `reservation.${status}`, "reservation", id, `${booking.name}, ${booking.date}`);
+  }
 
   // The guest hears about every decision; reopening a request is internal and stays quiet.
   const mail: Partial<Record<string, GuestMailKind>> = { confirmed: "confirmed", declined: "declined", cancelled: "cancelled" };
   const kind = mail[status];
-  if (booking && kind && before?.status !== status) {
+  if (booking && kind && before.status !== status) {
     const host = (await headers()).get("host");
-    const origin = host ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : "";
+    const fallback = host ? `${host.startsWith("localhost") ? "http" : "https"}://${host}` : "";
+    const origin = siteOrigin(fallback);
     after(() => notifyGuest(kind, booking, origin));
   }
   refresh();
@@ -61,16 +73,20 @@ export async function setReservationStatus(form: FormData) {
 
 export async function saveReservationNote(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) return;
   const note = text(form, "note", 2000);
-  await db()`update reservations set admin_note = ${note}, updated_at = now(), updated_by = ${me.id} where id = ${id}`;
-  await logActivity(me, "reservation.note", "reservation", id, note);
+  const rows = (await db()`
+    update reservations set admin_note = ${note}, updated_at = now(), updated_by = ${me.id} where id = ${id} returning id
+  `) as { id: string }[];
+  if (rows[0]) await logActivity(me, "reservation.note", "reservation", id, note);
   refresh();
 }
 
 export async function deleteReservation(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) return;
   const rows = (await db()`
     delete from reservations where id = ${id} returning name, date::text as date
   `) as { name: string; date: string }[];
@@ -108,7 +124,9 @@ export async function importDefaultMenu() {
 
 export async function saveCategory(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const rawId = text(form, "id", 40);
+  const id = uuid(form);
+  if (rawId && !id) return;
   const fields = {
     nameDe: text(form, "name_de", 80),
     nameEn: text(form, "name_en", 80),
@@ -120,13 +138,14 @@ export async function saveCategory(form: FormData) {
   const sql = db();
 
   if (id) {
-    await sql`
+    const rows = (await sql`
       update menu_categories
       set name_de = ${fields.nameDe}, name_en = ${fields.nameEn}, line_de = ${fields.lineDe},
           line_en = ${fields.lineEn}, visible = ${fields.visible}
       where id = ${id}
-    `;
-    await logActivity(me, "menu.category.update", "menu_category", id, fields.nameDe);
+      returning id
+    `) as { id: string }[];
+    if (rows[0]) await logActivity(me, "menu.category.update", "menu_category", id, fields.nameDe);
   } else {
     const [{ id: created }] = (await sql`
       insert into menu_categories (sort, name_de, name_en, line_de, line_en, visible)
@@ -141,7 +160,8 @@ export async function saveCategory(form: FormData) {
 
 export async function deleteCategory(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) return;
   const rows = (await db()`delete from menu_categories where id = ${id} returning name_de`) as { name_de: string }[];
   if (rows[0]) await logActivity(me, "menu.category.delete", "menu_category", id, rows[0].name_de);
   refresh({ site: true });
@@ -158,7 +178,7 @@ async function move(table: "menu_categories" | "menu_items", id: string, directi
   const ids = rows.map((row) => row.id);
   const from = ids.indexOf(id);
   const to = direction === "up" ? from - 1 : from + 1;
-  if (from < 0 || to < 0 || to >= ids.length) return;
+  if (from < 0 || to < 0 || to >= ids.length) return false;
   [ids[from], ids[to]] = [ids[to], ids[from]];
   await sql.transaction(
     ids.map((entry, index) =>
@@ -167,19 +187,26 @@ async function move(table: "menu_categories" | "menu_items", id: string, directi
         : sql`update menu_items set sort = ${index} where id = ${entry}`,
     ),
   );
+  return true;
 }
 
 export async function moveCategory(form: FormData) {
   const me = await requireOwner();
-  await move("menu_categories", text(form, "id"), text(form, "direction"));
-  await logActivity(me, "menu.category.move", "menu_category", text(form, "id"), text(form, "direction"));
+  const id = uuid(form);
+  const direction = text(form, "direction");
+  if (!id || !DIRECTIONS.includes(direction)) return;
+  if (await move("menu_categories", id, direction)) {
+    await logActivity(me, "menu.category.move", "menu_category", id, direction);
+  }
   refresh({ site: true });
 }
 
 export async function saveItem(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
-  const categoryId = text(form, "category_id");
+  const rawId = text(form, "id", 40);
+  const id = uuid(form);
+  const categoryId = uuid(form, "category_id");
+  if ((rawId && !id) || (!id && !categoryId)) return;
   const fields = {
     nameDe: text(form, "name_de", 120),
     nameEn: text(form, "name_en", 120),
@@ -193,15 +220,18 @@ export async function saveItem(form: FormData) {
 
   if (id) {
     const before = (await sql`select price from menu_items where id = ${id}`) as { price: string }[];
+    if (!before[0]) return;
     await sql`
       update menu_items
       set name_de = ${fields.nameDe}, name_en = ${fields.nameEn}, note_de = ${fields.noteDe},
           note_en = ${fields.noteEn}, price = ${fields.price}, visible = ${fields.visible}
       where id = ${id}
     `;
-    const priceChange = before[0] && before[0].price !== fields.price ? `: ${before[0].price} → ${fields.price}` : "";
+    const priceChange = before[0].price !== fields.price ? `: ${before[0].price} → ${fields.price}` : "";
     await logActivity(me, "menu.item.update", "menu_item", id, `${fields.nameDe}${priceChange}`);
   } else {
+    const [category] = (await sql`select id from menu_categories where id = ${categoryId}`) as { id: string }[];
+    if (!category) return;
     const [{ id: created }] = (await sql`
       insert into menu_items (category_id, sort, name_de, name_en, note_de, note_en, price, image, visible)
       values (${categoryId}, (select coalesce(max(sort), -1) + 1 from menu_items where category_id = ${categoryId}),
@@ -217,7 +247,8 @@ export async function saveItem(form: FormData) {
 
 export async function deleteItem(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) return;
   const rows = (await db()`delete from menu_items where id = ${id} returning name_de`) as { name_de: string }[];
   if (rows[0]) await logActivity(me, "menu.item.delete", "menu_item", id, rows[0].name_de);
   refresh({ site: true });
@@ -225,8 +256,13 @@ export async function deleteItem(form: FormData) {
 
 export async function moveItem(form: FormData) {
   const me = await requireOwner();
-  await move("menu_items", text(form, "id"), text(form, "direction"), text(form, "category_id"));
-  await logActivity(me, "menu.item.move", "menu_item", text(form, "id"), text(form, "direction"));
+  const id = uuid(form);
+  const categoryId = uuid(form, "category_id");
+  const direction = text(form, "direction");
+  if (!id || !categoryId || !DIRECTIONS.includes(direction)) return;
+  if (await move("menu_items", id, direction, categoryId)) {
+    await logActivity(me, "menu.item.move", "menu_item", id, direction);
+  }
   refresh({ site: true });
 }
 
@@ -251,16 +287,21 @@ export async function saveHours(form: FormData) {
     `);
     summary.push(`${day}:${closed ? "zu" : `${open}-${close}`}`);
   }
-  if (queries.length) await sql.transaction(queries);
+  if (!queries.length) return;
+  await sql.transaction(queries);
   await logActivity(me, "hours.update", "opening_hours", "", summary.join(" "));
   refresh({ site: true });
 }
+
+/* A real calendar day, so a typo never reaches the database as an error. */
+const isCalendarDate = (value: string) =>
+  DATE.test(value) && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
 
 export async function addClosedDate(form: FormData) {
   const me = await requireOwner();
   const date = text(form, "date");
   const reason = text(form, "reason", 200);
-  if (!DATE.test(date)) return;
+  if (!DATE.test(date) || !isCalendarDate(date)) return;
   await db()`
     insert into closed_dates (date, reason) values (${date}, ${reason})
     on conflict (date) do update set reason = excluded.reason
@@ -272,9 +313,9 @@ export async function addClosedDate(form: FormData) {
 export async function removeClosedDate(form: FormData) {
   const me = await requireOwner();
   const date = text(form, "date");
-  if (!DATE.test(date)) return;
-  await db()`delete from closed_dates where date = ${date}`;
-  await logActivity(me, "hours.closed_date.remove", "closed_date", date);
+  if (!DATE.test(date) || !isCalendarDate(date)) return;
+  const rows = (await db()`delete from closed_dates where date = ${date} returning date`) as unknown[];
+  if (rows[0]) await logActivity(me, "hours.closed_date.remove", "closed_date", date);
   refresh({ site: true });
 }
 
@@ -284,11 +325,34 @@ function usersPage(notice: string): never {
   redirect(`/admin/users?notice=${notice}`);
 }
 
-async function activeOwnerCount() {
-  const [{ count }] = (await db()`
-    select count(*)::int as count from users where role = 'owner' and active
-  `) as { count: number }[];
-  return count;
+/*
+  Role and active changes run behind one advisory lock, and the update itself
+  re-checks that another active owner remains. Two owners demoting or
+  deactivating each other at the same moment therefore cannot leave the bar
+  without an owner.
+*/
+const OWNER_LOCK = 5_050_505;
+
+async function guardedUserUpdate(id: string, change: { role?: "user" | "owner"; active?: boolean }) {
+  const sql = db();
+  const role = change.role ?? null;
+  const active = change.active ?? null;
+  const [, rows] = (await sql.transaction([
+    sql`select pg_advisory_xact_lock(${OWNER_LOCK})`,
+    sql`
+      update users set
+        role = coalesce(${role}::text, role),
+        active = coalesce(${active}::boolean, active)
+      where id = ${id}
+        and (
+          not (role = 'owner' and active)
+          or (coalesce(${role}::text, role) = 'owner' and coalesce(${active}::boolean, active))
+          or exists (select 1 from users other where other.role = 'owner' and other.active and other.id <> ${id})
+        )
+      returning email
+    `,
+  ])) as [unknown, { email: string }[]];
+  return rows[0]?.email ?? null;
 }
 
 export async function createUser(form: FormData) {
@@ -298,7 +362,7 @@ export async function createUser(form: FormData) {
   const password = String(form.get("password") ?? "");
   const role = text(form, "role") === "owner" ? "owner" : "user";
   if (!EMAIL.test(email)) usersPage("email");
-  if (password.length < 8) usersPage("password");
+  if (password.length < 8 || password.length > MAX_PASSWORD_LENGTH) usersPage("password");
 
   const rows = (await db()`
     insert into users (email, name, password_hash, role)
@@ -314,44 +378,68 @@ export async function createUser(form: FormData) {
 
 export async function setUserRole(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) usersPage("missing");
   const role = text(form, "role") === "owner" ? "owner" : "user";
   if (id === me.id && role !== "owner") usersPage("self");
-  if (role === "user" && (await activeOwnerCount()) <= 1) {
-    const target = (await db()`select role from users where id = ${id}`) as { role: string }[];
-    if (target[0]?.role === "owner") usersPage("lastOwner");
+  const email = await guardedUserUpdate(id, { role });
+  if (!email) {
+    const [exists] = (await db()`select 1 from users where id = ${id}`) as unknown[];
+    usersPage(exists ? "lastOwner" : "missing");
   }
-  const rows = (await db()`update users set role = ${role} where id = ${id} returning email`) as { email: string }[];
-  if (rows[0]) await logActivity(me, "user.role", "user", id, `${rows[0].email} → ${role}`);
+  // The role is read from the database on every request (lib/auth.ts), so the change applies at once.
+  await logActivity(me, "user.role", "user", id, `${email} → ${role}`);
   refresh();
   usersPage("saved");
 }
 
 export async function setUserActive(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) usersPage("missing");
   const active = text(form, "active") === "true";
   if (id === me.id && !active) usersPage("self");
-  const sql = db();
-  const rows = (await sql`update users set active = ${active} where id = ${id} returning email`) as { email: string }[];
+  const email = await guardedUserUpdate(id, { active });
+  if (!email) {
+    const [exists] = (await db()`select 1 from users where id = ${id}`) as unknown[];
+    usersPage(exists ? "lastOwner" : "missing");
+  }
   // Signing a deactivated account out everywhere at once.
-  if (!active) await sql`delete from sessions where user_id = ${id}`;
-  if (rows[0]) await logActivity(me, active ? "user.activate" : "user.deactivate", "user", id, rows[0].email);
+  if (!active) await db()`delete from sessions where user_id = ${id}`;
+  await logActivity(me, active ? "user.activate" : "user.deactivate", "user", id, email);
   refresh();
   usersPage("saved");
 }
 
 export async function resetPassword(form: FormData) {
   const me = await requireOwner();
-  const id = text(form, "id");
+  const id = uuid(form);
+  if (!id) usersPage("missing");
   const password = String(form.get("password") ?? "");
-  if (password.length < 8) usersPage("password");
+  if (password.length < 8 || password.length > MAX_PASSWORD_LENGTH) usersPage("password");
   const sql = db();
   const rows = (await sql`
     update users set password_hash = ${await hashPassword(password)} where id = ${id} returning email
   `) as { email: string }[];
+  if (!rows[0]) usersPage("missing");
   // Other devices must sign in again with the new password; the owner's own session survives.
   if (id !== me.id) await sql`delete from sessions where user_id = ${id}`;
-  if (rows[0]) await logActivity(me, "user.password", "user", id, rows[0].email);
+  await logActivity(me, "user.password", "user", id, rows[0].email);
+  refresh();
   usersPage("password-reset");
+}
+
+/* Ends every session of an account (a lost phone, a shared computer). The owner's own browser stays signed in. */
+export async function revokeUserSessions(form: FormData) {
+  const me = await requireOwner();
+  const id = uuid(form);
+  if (!id) usersPage("missing");
+  const sql = db();
+  const [user] = (await sql`select email from users where id = ${id}`) as { email: string }[];
+  if (!user) usersPage("missing");
+  if (id === me.id) await revokeOtherSessions(id);
+  else await sql`delete from sessions where user_id = ${id}`;
+  await logActivity(me, "user.sessions_revoked", "user", id, user.email);
+  refresh();
+  usersPage("signed-out");
 }
