@@ -14,9 +14,12 @@ import {
 } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifyCancellation } from "@/lib/mailer";
-import { isUuid } from "@/lib/security";
+import { isUuid, OWNER_LOCK, overLimit } from "@/lib/security";
 
-export type ProfileError = "name" | "phone" | "wrongPassword" | "password";
+export type ProfileError = "name" | "phone" | "wrongPassword" | "password" | "tooMany";
+
+/* Password changes per account: a stolen session cannot be used to guess the current password at scrypt speed. */
+const PASSWORD_LIMIT = { perUser: 5, windowSeconds: 15 * 60 };
 export interface ProfileState {
   error: ProfileError | null;
   done: boolean;
@@ -39,6 +42,9 @@ export async function changePassword(_previous: ProfileState, form: FormData): P
   const me = await requireUser();
   const current = String(form.get("current") ?? "");
   const next = String(form.get("password") ?? "");
+  if (await overLimit("password:user", me.id, PASSWORD_LIMIT.perUser, PASSWORD_LIMIT.windowSeconds)) {
+    return { error: "tooMany", done: false };
+  }
   const sql = db();
   const [row] = (await sql`select password_hash from users where id = ${me.id}`) as { password_hash: string }[];
   if (!row) return { error: "wrongPassword", done: false };
@@ -109,12 +115,45 @@ export async function deleteMyAccount(_previous: DeleteError | null, form: FormD
       and date >= (now() at time zone 'Europe/Berlin')::date
   `) as { name: string; phone: string; date: string; time: string; guests: number; is_private: boolean }[];
 
-  await sql.transaction([
-    sql`delete from reservations where user_id = ${me.id}`,
-    sql`update activity_log set user_email = 'gelöschtes Konto', detail = '' where user_id = ${me.id}`,
-    sql`delete from login_attempts where email = ${me.email}`,
-    sql`delete from users where id = ${me.id}`,
-  ]);
+  /*
+    The check above is only the quick answer. Two owners deleting themselves at
+    once could both pass it, so the transaction takes the same advisory lock as
+    role changes in the admin portal (OWNER_LOCK) and every statement repeats
+    the check: if this is the last active owner, nothing is changed.
+  */
+  const [, , , , removed] = (await sql.transaction([
+    sql`select pg_advisory_xact_lock(${OWNER_LOCK})`,
+    sql`
+      delete from reservations where user_id = ${me.id}
+        and not exists (
+          select 1 from users self where self.id = ${me.id} and self.role = 'owner' and self.active
+            and not exists (select 1 from users o where o.role = 'owner' and o.active and o.id <> ${me.id})
+        )
+    `,
+    sql`
+      update activity_log set user_email = 'gelöschtes Konto', detail = '' where user_id = ${me.id}
+        and not exists (
+          select 1 from users self where self.id = ${me.id} and self.role = 'owner' and self.active
+            and not exists (select 1 from users o where o.role = 'owner' and o.active and o.id <> ${me.id})
+        )
+    `,
+    sql`
+      delete from login_attempts where email = ${me.email}
+        and not exists (
+          select 1 from users self where self.id = ${me.id} and self.role = 'owner' and self.active
+            and not exists (select 1 from users o where o.role = 'owner' and o.active and o.id <> ${me.id})
+        )
+    `,
+    sql`
+      delete from users where id = ${me.id}
+        and not (
+          role = 'owner' and active
+          and not exists (select 1 from users o where o.role = 'owner' and o.active and o.id <> ${me.id})
+        )
+      returning id
+    `,
+  ])) as [unknown, unknown, unknown, unknown, { id: string }[]];
+  if (!removed[0]) return "lastOwner";
   await logActivity(null, "user.deleted", "user", "", `${upcoming.length} offene Reservierungen entfernt`);
   for (const booking of upcoming) after(() => notifyCancellation(booking, "gelöschtes Konto"));
 

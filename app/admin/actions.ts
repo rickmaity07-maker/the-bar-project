@@ -9,7 +9,7 @@ import { hashPassword, MAX_PASSWORD_LENGTH, requireOwner, revokeOtherSessions } 
 import { db } from "@/lib/db";
 import { isValidEmail } from "@/lib/email";
 import { notifyGuest, type GuestBooking, type GuestMailKind } from "@/lib/guest-mail";
-import { isUuid, siteOrigin } from "@/lib/security";
+import { isUuid, OWNER_LOCK, siteOrigin } from "@/lib/security";
 import { defaultMenu, FALLBACK_DRINK_IMAGE } from "@/lib/site";
 
 /*
@@ -329,9 +329,9 @@ function usersPage(notice: string): never {
   Role and active changes run behind one advisory lock, and the update itself
   re-checks that another active owner remains. Two owners demoting or
   deactivating each other at the same moment therefore cannot leave the bar
-  without an owner.
+  without an owner. Deleting one's own account (app/profile/actions.ts) takes
+  the same lock.
 */
-const OWNER_LOCK = 5_050_505;
 
 async function guardedUserUpdate(id: string, change: { role?: "user" | "owner"; active?: boolean }) {
   const sql = db();
@@ -422,8 +422,9 @@ export async function resetPassword(form: FormData) {
     update users set password_hash = ${await hashPassword(password)} where id = ${id} returning email
   `) as { email: string }[];
   if (!rows[0]) usersPage("missing");
-  // Other devices must sign in again with the new password; the owner's own session survives.
-  if (id !== me.id) await sql`delete from sessions where user_id = ${id}`;
+  // Other devices must sign in again with the new password; the owner's own browser stays signed in.
+  if (id === me.id) await revokeOtherSessions(me.id);
+  else await sql`delete from sessions where user_id = ${id}`;
   await logActivity(me, "user.password", "user", id, rows[0].email);
   refresh();
   usersPage("password-reset");

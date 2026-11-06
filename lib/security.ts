@@ -11,11 +11,29 @@ import { db } from "@/lib/db";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (value: unknown): value is string => typeof value === "string" && UUID.test(value);
 
-/* Vercel sets x-real-ip and puts the client first in x-forwarded-for; anything else falls back to one shared bucket. */
+/*
+  The client address, for rate limits only. On Vercel (process.env.VERCEL is
+  set) the edge network overwrites x-real-ip and x-forwarded-for with the real
+  client, so a visitor cannot choose them. Anywhere else (next start on a
+  server, a local run, the e2e suite) nothing guarantees a proxy rewrites those
+  headers: trusting them would let anyone pick a fresh "IP" per request and
+  slip past every per-IP limit. There, every request shares one fixed bucket,
+  which errs on the side of limiting too much. Behind another trusted proxy,
+  adapt this function to that proxy's header.
+*/
+const SHARED_IP_BUCKET = "untrusted-proxy";
 export function clientIp(source: Headers) {
+  if (!process.env.VERCEL) return SHARED_IP_BUCKET;
   const forwarded = source.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return source.get("x-real-ip")?.trim() || forwarded || "unknown";
+  return source.get("x-real-ip")?.trim() || forwarded || SHARED_IP_BUCKET;
 }
+
+/*
+  One advisory lock for every change that could leave the bar without an
+  active owner (role and active changes in the admin portal, an owner deleting
+  their own account). Taken inside each transaction with pg_advisory_xact_lock.
+*/
+export const OWNER_LOCK = 5_050_505;
 
 /*
   Pseudonymised (Art. 4 Nr. 5 DSGVO): an HMAC, so the stored value cannot be
