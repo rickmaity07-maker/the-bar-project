@@ -42,7 +42,8 @@ export default async function AdminOverview() {
         where status = 'pending' and date >= ${today} order by date, time limit 5`,
     sql`select ${sql.unsafe(RESERVATION_COLUMNS)} from reservations
         where status = 'confirmed' and date >= ${today} order by date, time limit 5`,
-    sql`select id, at, user_email, action, detail from activity_log order by at desc limit 8`,
+    // Changes only: sign-ins and sign-outs have their own tab on the activity page.
+    sql`select id, at, user_email, action, detail from activity_log where action not in ('user.signin', 'user.signout') order by at desc limit 8`,
   ])) as [Stats[], ReservationRow[], ReservationRow[], ActivityRow[]];
 
   const tiles = [

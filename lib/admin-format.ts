@@ -84,6 +84,10 @@ const ACTIONS: Record<string, string> = {
   "user.activate": "Nutzer aktiviert",
   "user.deactivate": "Nutzer deaktiviert",
   "user.password": "Passwort zurückgesetzt",
+  "user.signin": "Angemeldet",
+  "user.google_unlink": "Google-Verknüpfung gelöst",
+  "user.sessions_revoked": "Auf allen Geräten abgemeldet",
+  "reservation.export": "Reservierungen als CSV geladen",
 };
 
 export const actionLabel = (action: string) => ACTIONS[action] ?? action;

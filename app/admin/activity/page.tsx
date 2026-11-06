@@ -1,4 +1,5 @@
 import { Empty, PageTitle, Panel } from "@/components/admin/Panel";
+import { INPUT } from "@/components/admin/styles";
 import { actionLabel, formatStamp } from "@/lib/admin-format";
 import { requireOwner } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -15,7 +16,7 @@ interface ActivityRow {
 type Params = Promise<Record<string, string | string[] | undefined>>;
 
 const AREAS: [string, string][] = [
-  ["all", "Alles"],
+  ["all", "Alle Änderungen"],
   ["reservation", "Reservierungen"],
   ["menu", "Karte"],
   ["hours", "Öffnungszeiten"],
@@ -23,6 +24,7 @@ const AREAS: [string, string][] = [
   ["night", "Abende"],
   ["gallery", "Galerie"],
   ["user", "Nutzer"],
+  ["signin", "Anmeldungen"],
 ];
 const PAGE_SIZE = 100;
 
@@ -30,21 +32,39 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
   await requireOwner();
   const params = await searchParams;
   const area = AREAS.some(([key]) => key === params.area) ? String(params.area) : "all";
-  const page = Math.max(0, Number.parseInt(String(params.page ?? "0"), 10) || 0);
+  const page = Math.min(10_000, Math.max(0, Number.parseInt(String(params.page ?? "0"), 10) || 0));
+  const q = String(Array.isArray(params.q) ? params.q[0] : (params.q ?? "")).trim().slice(0, 100);
+  const like = `%${q.replace(/[%_\\]/g, (char) => `\\${char}`)}%`;
+  // Sign-ins and sign-outs only appear under "Anmeldungen", so they never bury the changes.
+  const pattern = `${area}.%`;
 
   const rows = (await db()`
     select id, at, user_email, action, entity, detail from activity_log
-    where (${area} = 'all' or action like ${`${area}.%`})
+    where (${area} = 'all' or (${area} = 'signin' and action in ('user.signin', 'user.signout')) or action like ${pattern})
+      and (${area} = 'signin' or action not in ('user.signin', 'user.signout'))
+      and (${q} = '' or user_email ilike ${like} or detail ilike ${like})
     order by at desc
     limit ${PAGE_SIZE + 1} offset ${page * PAGE_SIZE}
   `) as ActivityRow[];
   const hasMore = rows.length > PAGE_SIZE;
   const link = (next: Record<string, string | number>) =>
-    `/admin/activity?${new URLSearchParams({ area, page: String(page), ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, String(v)])) })}`;
+    `/admin/activity?${new URLSearchParams({ area, q, page: String(page), ...Object.fromEntries(Object.entries(next).map(([k, v]) => [k, String(v)])) })}`;
 
   return (
     <>
       <PageTitle title="Aktivität" />
+      <form className="mb-4 flex flex-wrap gap-2">
+        <input type="hidden" name="area" value={area} />
+        <input name="q" defaultValue={q} placeholder="E-Mail oder Details" aria-label="Suche" className={`${INPUT} w-64`} />
+        <button type="submit" className="label rounded-full bg-buoy px-5 py-2.5 text-abyss transition-colors hover:bg-foam">
+          Suchen
+        </button>
+        {q && (
+          <a href={link({ q: "", page: 0 })} className="label flex items-center px-3 text-mist hover:text-foam">
+            Zurücksetzen
+          </a>
+        )}
+      </form>
       <div className="mb-6 flex flex-wrap gap-2">
         {AREAS.map(([key, label]) => (
           <a
