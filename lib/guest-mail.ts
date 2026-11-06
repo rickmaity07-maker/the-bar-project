@@ -1,5 +1,6 @@
 import "server-only";
-import { escape, getMailer, isMailerConfigured } from "@/lib/mailer";
+import { stripControl } from "@/lib/email";
+import { escape, getMailer, headerAddress, isMailerConfigured, mailError } from "@/lib/mailer";
 import { getSiteData } from "@/lib/site-data";
 
 /*
@@ -41,7 +42,7 @@ const COPY = {
     },
     privateEvent: "Private Veranstaltung (gesamte Bar)",
     table: "Tisch",
-    labels: { kind: "Art", date: "Datum", time: "Uhrzeit", guests: "Gäste" },
+    labels: { name: "Name", kind: "Art", date: "Datum", time: "Uhrzeit", guests: "Gäste" },
     guests: (n: number) => (n === 1 ? "1 Gast" : `${n} Gäste`),
     at: (time: string, end: string | null) => (end ? `${time} bis ${end} Uhr` : `${time} Uhr`),
     profile: "Im Profil ansehen",
@@ -69,7 +70,7 @@ const COPY = {
     },
     privateEvent: "Private event (whole bar)",
     table: "Table",
-    labels: { kind: "Type", date: "Date", time: "Time", guests: "Guests" },
+    labels: { name: "Name", kind: "Type", date: "Date", time: "Time", guests: "Guests" },
     guests: (n: number) => (n === 1 ? "1 guest" : `${n} guests`),
     at: (time: string, end: string | null) => (end ? `${time} to ${end}` : time),
     profile: "View on your profile",
@@ -80,7 +81,9 @@ const COPY = {
 
 /* Never throws: an email problem must not undo the change in the portal. */
 export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, origin: string) {
-  if (!isMailerConfigured() || !booking.email) return;
+  // The booking's address goes into the To header, so it must pass the strict check again.
+  const to = headerAddress(booking.email);
+  if (!isMailerConfigured() || !to) return;
   const c = booking.locale === "en" ? COPY.en : COPY.de;
   const { venue } = await getSiteData();
   const address = `${venue.name}, ${venue.street}, ${venue.postalCity}`;
@@ -92,13 +95,16 @@ export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, or
     timeZone: "UTC",
   });
   const rows: [string, string][] = [
+    // In the body only, where it is escaped; never in a header.
+    [c.labels.name, stripControl(booking.name)],
     [c.labels.kind, booking.is_private ? c.privateEvent : c.table],
     [c.labels.date, date],
     [c.labels.time, c.at(booking.time, booking.end_time)],
     [c.labels.guests, c.guests(booking.guests)],
   ];
   const profileUrl = `${origin}/profile`;
-  const subject = `${c.subject[kind]} – ${booking.name}, ${date}, ${booking.time}`;
+  // No guest-supplied text in the subject (the name could be anything); date and time are validated.
+  const subject = `${c.subject[kind]} – ${date}, ${booking.time}`;
   const text = [
     c.heading[kind],
     "",
@@ -129,13 +135,13 @@ export async function notifyGuest(kind: GuestMailKind, booking: GuestBooking, or
   try {
     await getMailer().sendMail({
       from: `${process.env.GMAIL_FROM_NAME ?? "Bar-05"} <${process.env.GMAIL_USER}>`,
-      to: booking.email,
+      to,
       subject,
       text,
       html,
     });
     console.info(`Guest email sent (${kind}) for ${booking.date}`);
   } catch (error) {
-    console.error(`Guest email failed (${kind}):`, error);
+    console.error(`Guest email failed (${kind}):`, mailError(error));
   }
 }

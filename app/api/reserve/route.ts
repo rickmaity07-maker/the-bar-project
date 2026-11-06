@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { getSession } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
+import { stripControl } from "@/lib/email";
 import { notifyGuest } from "@/lib/guest-mail";
 import { notifyNewReservation } from "@/lib/mailer";
 import { validateReservation, type ReservationInput } from "@/lib/reservation";
@@ -57,9 +58,11 @@ export async function POST(request: Request) {
   const isPrivate = body.isPrivate === true;
   // Only strings and numbers count; objects or arrays become empty and fail validation.
   const text = (value: unknown) => (typeof value === "string" || typeof value === "number" ? String(value).trim() : "");
+  // Single-line fields lose control characters (CR/LF included), so none can reach a mail header or log line.
+  const line = (value: unknown) => stripControl(text(value));
   const input: ReservationInput = {
-    name: text(body.name),
-    phone: text(body.phone),
+    name: line(body.name),
+    phone: line(body.phone),
     date: text(body.date),
     time: text(body.time),
     guests: text(body.guests),
@@ -68,7 +71,7 @@ export async function POST(request: Request) {
     occasion: isPrivate ? text(body.occasion) : "",
     endTime: isPrivate ? text(body.endTime) : "",
     // Private events can name a different contact address; tables use the account's.
-    email: isPrivate ? text(body.email) : account.email,
+    email: isPrivate ? line(body.email) : account.email,
     message: isPrivate ? text(body.message) : "",
   };
 

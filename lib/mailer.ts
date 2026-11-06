@@ -1,6 +1,7 @@
 import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { formatDate, OCCASION_LABEL } from "@/lib/admin-format";
+import { isValidEmail, stripControl } from "@/lib/email";
 import type { ReservationInput } from "@/lib/reservation";
 
 /*
@@ -31,19 +32,33 @@ export function getMailer(): Transporter {
 export const escape = (value: string) =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
+/*
+  A guest-supplied address as a header value: control characters removed and
+  the shape checked again, or nothing at all. Nodemailer encodes headers too;
+  this keeps a CR/LF or a second address from ever reaching it.
+*/
+export function headerAddress(value: string | null | undefined) {
+  const address = stripControl(value ?? "").trim();
+  return address && isValidEmail(address) ? address : undefined;
+}
+
+/* Only the message: an SMTP error object can carry the server's reply and connection details. */
+export const mailError = (error: unknown) => (error instanceof Error ? error.message : "unknown error");
+
 /* Tells the bar about a new request. Never throws: a failed email must not lose the booking. */
 export async function notifyNewReservation(input: ReservationInput, adminUrl: string) {
   if (!isMailerConfigured()) return;
 
   const guests = `${input.guests} ${input.guests === "1" ? "Gast" : "Gäste"}`;
   const when = `${formatDate(input.date)}, ${input.time}${input.endTime ? ` bis ${input.endTime}` : ""} Uhr`;
+  // The guest's name stays out of the subject: it is free text, and only the body is escaped and quoted.
   const subject = input.isPrivate
-    ? `Private Veranstaltung angefragt: ${input.name}, ${formatDate(input.date)}`
-    : `Neue Reservierung: ${input.name}, ${formatDate(input.date)} ${input.time}, ${guests}`;
+    ? `Private Veranstaltung angefragt: ${formatDate(input.date)}`
+    : `Neue Reservierung: ${formatDate(input.date)} ${input.time}, ${guests}`;
 
   const rows: [string, string][] = [
     ["Art", input.isPrivate ? "Private Buchung der gesamten Bar" : "Tisch"],
-    ["Name", input.name],
+    ["Name", stripControl(input.name)],
     ["Telefon", input.phone],
     ["Datum", when],
     [input.isPrivate ? "Erwartete Gäste" : "Gäste", guests],
@@ -82,7 +97,7 @@ export async function notifyNewReservation(input: ReservationInput, adminUrl: st
       from: `${process.env.GMAIL_FROM_NAME ?? "Bar-05"} <${process.env.GMAIL_USER}>`,
       to: process.env.RESERVATION_NOTIFY_EMAIL,
       // Replying goes straight to the guest when they left an address.
-      replyTo: input.email || undefined,
+      replyTo: headerAddress(input.email),
       subject,
       text,
       html,
@@ -91,7 +106,7 @@ export async function notifyNewReservation(input: ReservationInput, adminUrl: st
     const preview = nodemailer.getTestMessageUrl(info);
     console.info("Booking notification sent:", info.messageId, preview || "");
   } catch (error) {
-    console.error("Booking notification email failed:", error);
+    console.error("Booking notification email failed:", mailError(error));
   }
 }
 
@@ -112,7 +127,7 @@ export async function notifyCancellation(booking: CancelledBooking, accountEmail
   const lines = [
     `${kind} vom Gast storniert.`,
     "",
-    `Name: ${booking.name}`,
+    `Name: ${stripControl(booking.name)}`,
     `Telefon: ${booking.phone}`,
     `Datum: ${when}`,
     `Gäste: ${booking.guests}`,
@@ -122,8 +137,8 @@ export async function notifyCancellation(booking: CancelledBooking, accountEmail
     await getMailer().sendMail({
       from: `${process.env.GMAIL_FROM_NAME ?? "Bar-05"} <${process.env.GMAIL_USER}>`,
       to: process.env.RESERVATION_NOTIFY_EMAIL,
-      replyTo: accountEmail,
-      subject: `Storniert: ${booking.name}, ${when}`,
+      replyTo: headerAddress(accountEmail),
+      subject: `Storniert: ${kind}, ${when}`,
       text: lines.join("\n"),
       html: `<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6">${lines
         .map((line) => escape(line) || "&nbsp;")
@@ -131,6 +146,6 @@ export async function notifyCancellation(booking: CancelledBooking, accountEmail
     });
     console.info(`Cancellation email sent for ${booking.date}`);
   } catch (error) {
-    console.error("Cancellation email failed:", error);
+    console.error("Cancellation email failed:", mailError(error));
   }
 }

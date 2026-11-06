@@ -1,3 +1,4 @@
+import { isValidEmail } from "@/lib/email";
 import { isClosedOn, type ClosedDate, type DayHours } from "@/lib/site";
 
 export const OCCASIONS = ["birthday", "company", "wedding", "other"] as const;
@@ -47,11 +48,10 @@ export const MAX_MESSAGE_LENGTH = 1000;
 
 export const MAX_NAME_LENGTH = 120;
 export const MAX_PHONE_LENGTH = 40;
-export const MAX_EMAIL_LENGTH = 200;
+export { MAX_EMAIL_LENGTH } from "@/lib/email";
 
 /* A real clock time, so the database never sees "25:99". */
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* YYYY-MM-DD that names a real day (no 31 February). */
 function isCalendarDate(value: string) {
@@ -92,7 +92,7 @@ export function validateReservation(input: ReservationInput, schedule: Schedule)
   if (input.isPrivate) {
     if (!(OCCASIONS as readonly string[]).includes(input.occasion)) errors.occasion = "occasion";
     if (!TIME.test(input.endTime)) errors.endTime = "endTime";
-    if (!EMAIL.test(input.email.trim()) || input.email.length > MAX_EMAIL_LENGTH) errors.email = "email";
+    if (!isValidEmail(input.email.trim())) errors.email = "email";
     if (input.message.length > MAX_MESSAGE_LENGTH) errors.message = "message";
   }
 

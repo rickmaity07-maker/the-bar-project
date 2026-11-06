@@ -1020,21 +1020,21 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
   });
   await check("Guest: a receipt for every booking, sent to the booking's address", async () => {
     const receipts = [...subjects("Anfrage erhalten"), ...subjects("Request received")];
-    const ben = receipts.find((m) => m.subject.includes("Ben Event"));
+    const ben = receipts.find((m) => m.source.includes("Ben Event"));
     return { ok: receipts.length === 6 && ben?.to === BEN && receipts.filter((m) => m.to === GUEST).length === 5, extra: `${receipts.length} receipts` };
   });
   await check("Guest: confirmed, cancelled and declined emails for Anna", async () => {
-    const anna = (prefix: string) => subjects(prefix).filter((m) => m.subject.includes("Anna Tisch")).length;
+    const anna = (prefix: string) => subjects(prefix).filter((m) => m.source.includes("Anna Tisch")).length;
     const counts = [anna("Reservierung bestätigt"), anna("Reservierung storniert"), anna("Reservierung leider nicht möglich")];
     const declined = subjects("Reservierung leider nicht möglich")[0];
     return { ok: counts.every((n) => n === 1) && Boolean(declined?.source.includes("keinen Platz")), extra: counts.join("/") };
   });
   await check("Guest who booked in English gets the confirmation in English", async () => {
-    const m = subjects("Booking confirmed").find((x) => x.subject.includes("Chris English"));
+    const m = subjects("Booking confirmed").find((x) => x.source.includes("Chris English"));
     return { ok: Boolean(m && m.source.includes("Your table is confirmed") && m.source.includes("View on your profile")), extra: m?.subject };
   });
   await check("Reopening a request sends the guest nothing", async () =>
-    ({ ok: mails.filter((m) => m.subject.includes("Anna Tisch") && m.to === GUEST).length === 4, extra: "receipt, confirmed, cancelled, declined" }));
+    ({ ok: mails.filter((m) => m.source.includes("Anna Tisch") && m.to === GUEST).length === 4, extra: "receipt, confirmed, cancelled, declined" }));
   await check("Private-event email: subject, details, Reply-To guest, script shown as text", async () => {
     const m = mails.find((x) => x.subject.startsWith("Private Veranstaltung angefragt"));
     if (!m) return { ok: false, extra: "not found" };
@@ -1042,12 +1042,16 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok, extra: m.subject };
   });
   await check("Table email has date, time and guests", async () => {
-    const m = mails.find((x) => x.subject.startsWith("Neue Reservierung: Anna Tisch"));
-    return { ok: Boolean(m && m.subject.includes("07.10.2026 19:30, 4 Gäste") && m.source.includes("0171 1111111")), extra: m?.subject };
+    const m = subjects("Neue Reservierung").find((x) => x.source.includes("Anna Tisch"));
+    return { ok: Boolean(m && m.subject.includes("06.10.2027 19:30, 4 Gäste") && m.source.includes("0171 1111111")), extra: m?.subject };
   });
   await check("Cancellation email names the guest and their account", async () => {
     const m = mails.find((x) => x.subject.startsWith("Storniert"));
-    return { ok: Boolean(m && m.subject.includes("Storno Test") && m.source.includes(GUEST) && m.replyTo === GUEST), extra: m?.subject };
+    return { ok: Boolean(m && m.source.includes("Storno Test") && m.source.includes(GUEST) && m.replyTo === GUEST), extra: m?.subject };
+  });
+  await check("No guest-supplied name ever reaches a subject line", async () => {
+    const leaked = mails.filter((m) => m.subject.includes(state.run) || /Anna|Ben Event|Chris|Dora|Storno Test|Erika/.test(m.subject));
+    return { ok: mails.length > 0 && leaked.length === 0, extra: leaked.map((m) => m.subject).join(" | ") };
   });
 
   /* ================= DATA SUBJECT RIGHTS ================= */

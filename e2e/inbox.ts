@@ -22,7 +22,8 @@ function decode(source: string) {
 
 /*
   Reads the real Gmail inbox over IMAP (the same App Password the site sends
-  with) and waits until `expected` messages whose subject contains `tag` arrived.
+  with) and waits until `expected` messages containing `tag` arrived. The tag
+  rides on the guest names, which only appear in the body (never the subject).
 */
 export async function waitForMail(tag: string, expected: number, timeoutMs = 120_000): Promise<ReceivedMail[]> {
   const deadline = Date.now() + timeoutMs;
@@ -38,7 +39,7 @@ export async function waitForMail(tag: string, expected: number, timeoutMs = 120
     await client.connect();
     const lock = await client.getMailboxLock("INBOX");
     try {
-      const ids = (await client.search({ subject: tag, since: new Date(Date.now() - 86_400_000) })) || [];
+      const ids = (await client.search({ body: tag, since: new Date(Date.now() - 86_400_000) })) || [];
       found = [];
       for (const id of ids) {
         const message = await client.fetchOne(String(id), { envelope: true, source: true });

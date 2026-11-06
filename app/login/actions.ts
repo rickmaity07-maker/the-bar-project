@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
+import { isValidEmail } from "@/lib/email";
 import { clearLoginFailures, isLoginBlocked, recordLoginFailure } from "@/lib/login-throttle";
 import { overLimit, requestIpKey } from "@/lib/security";
 
@@ -32,9 +33,6 @@ export interface LoginState {
   error: LoginError | null;
   email: string;
 }
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_EMAIL_LENGTH = 200;
 
 interface UserRow {
   id: string;
@@ -56,7 +54,7 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
   const next = safeNext(form.get("next"));
 
   if (!hasDatabase()) return { error: "unavailable", email: "" };
-  if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return { error: "email", email: "" };
+  if (!isValidEmail(email)) return { error: "email", email: "" };
 
   const ip = await requestIpKey();
   if (await isLoginBlocked(email, ip)) return { error: "tooMany", email };

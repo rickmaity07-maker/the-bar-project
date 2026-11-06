@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
 import { hashPassword, MAX_PASSWORD_LENGTH, requireOwner, revokeOtherSessions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isValidEmail } from "@/lib/email";
 import { notifyGuest, type GuestBooking, type GuestMailKind } from "@/lib/guest-mail";
 import { isUuid, siteOrigin } from "@/lib/security";
 import { defaultMenu, FALLBACK_DRINK_IMAGE } from "@/lib/site";
@@ -20,7 +21,6 @@ import { defaultMenu, FALLBACK_DRINK_IMAGE } from "@/lib/site";
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUSES = ["pending", "confirmed", "declined", "cancelled"] as const;
 const DIRECTIONS = ["up", "down"];
 
@@ -361,7 +361,7 @@ export async function createUser(form: FormData) {
   const name = text(form, "name", 120);
   const password = String(form.get("password") ?? "");
   const role = text(form, "role") === "owner" ? "owner" : "user";
-  if (!EMAIL.test(email)) usersPage("email");
+  if (!isValidEmail(email)) usersPage("email");
   if (password.length < 8 || password.length > MAX_PASSWORD_LENGTH) usersPage("password");
 
   const rows = (await db()`
