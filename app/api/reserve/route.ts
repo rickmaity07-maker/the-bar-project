@@ -15,6 +15,30 @@ const MAX_BODY_BYTES = 16 * 1024;
 const refuse = (status: number, message: string) => Response.json({ ok: false, message }, { status });
 
 /*
+  Reads the body as text, stopping as soon as it passes `limit` bytes. The
+  Content-Length header is only a hint (it can be missing, or a chunked body
+  can lie about it), so the bytes are counted as they arrive and the stream is
+  cancelled; nothing larger is ever held in memory. Returns null when too large.
+*/
+async function readCapped(request: Request, limit: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+}
+
+/*
   Validates a reservation request, stores it as "pending" under the signed-in
   account and emails the bar about it. Booking needs an account.
 
@@ -47,8 +71,8 @@ export async function POST(request: Request) {
 
   let body: Partial<Record<keyof ReservationInput | "locale", unknown>>;
   try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_BYTES) return refuse(413, "Request too large.");
+    const raw = await readCapped(request, MAX_BODY_BYTES);
+    if (raw === null) return refuse(413, "Request too large.");
     body = JSON.parse(raw);
   } catch {
     return refuse(400, "Invalid request.");
