@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { contentSecurityPolicy } from "./lib/csp";
 
 const nextConfig: NextConfig = {
   // The end-to-end suite builds into its own folder (see playwright.config.ts).
@@ -12,9 +13,15 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" },
         ],
+      },
+      {
+        // The signed-in pages get a stricter, per-request policy with a nonce from proxy.ts (see lib/csp.ts).
+        source: "/((?!admin|profile|login).*)",
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy() }],
       },
     ];
   },
