@@ -11,10 +11,11 @@ It covers:
 
 - the public pages and menu
 - booking with an account, including private events
-- the booking API
+- the booking API, including the cross-site, JSON-only and bad-input refusals
+- the security headers and both Content Security Policies (no violations in the browser)
 - the profile
 - login, Google sign-in and roles
-- every admin feature
+- every admin feature, including CSV export, date filters, signing an account out everywhere and the map-link check
 - the booking and cancellation emails
 - phone layouts
 

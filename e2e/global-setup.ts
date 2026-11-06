@@ -29,6 +29,8 @@ export default async function globalSetup() {
   await sql`delete from users where email like '%@bar-05.test' or email like '%+e2e-%'`;
   await sql`delete from login_attempts`;
   await sql`delete from activity_log`;
+  // Rate-limit counters from earlier runs would otherwise block this run's bookings.
+  await sql`delete from rate_events`;
   await sql`delete from closed_dates`;
   await sql`delete from menu_categories where name_de = 'Testkategorie'`;
   // The bar's real week: Monday and Tuesday closed, until three on Friday and Saturday.

@@ -154,6 +154,28 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
       h("permissions-policy").includes("camera=()");
     return { ok, extra: ok ? "nosniff, DENY, referrer, CSP, permissions" : JSON.stringify(Object.fromEntries(r.headers)) };
   });
+  await check("Signed-in pages get a nonce CSP, public pages a locked-down static one", async () => {
+    const login = (await fetch(`${BASE}/login`)).headers.get("content-security-policy") ?? "";
+    const again = (await fetch(`${BASE}/login`)).headers.get("content-security-policy") ?? "";
+    const home = (await fetch(BASE)).headers.get("content-security-policy") ?? "";
+    const nonce = login.match(/'nonce-([^']+)'/)?.[1];
+    const ok = Boolean(nonce) && !again.includes(nonce!) && login.includes("'strict-dynamic'") && !login.includes("script-src 'self' 'unsafe-inline'") &&
+      home.includes("object-src 'none'") && home.includes("default-src 'self'") && !home.includes("unsafe-eval");
+    return { ok, extra: `${login.slice(0, 60)} | ${home.slice(0, 60)}` };
+  });
+  await check("Login and homepage run without CSP violations", async () => {
+    const p = await browser.newPage();
+    const violations: string[] = [];
+    p.on("console", (m) => { if (/Content Security Policy|Refused to/.test(m.text())) violations.push(m.text().slice(0, 120)); });
+    await p.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+    await p.getByRole("tab", { name: "Registrieren" }).click();
+    const hydrated = (await p.getByRole("tab", { name: "Registrieren" }).getAttribute("aria-selected")) === "true";
+    await p.goto(BASE, { waitUntil: "networkidle" });
+    await p.mouse.wheel(0, 2500);
+    await settle(p, 1200);
+    await p.close();
+    return { ok: hydrated && violations.length === 0, extra: violations.join(" | ") || "hydrated, no violations" };
+  });
   await check("Clean-up job refuses calls without the secret", async () => {
     const none = await fetch(`${BASE}/api/cron/cleanup`);
     const wrong = await fetch(`${BASE}/api/cron/cleanup`, { headers: { authorization: "Bearer falsch" } });
@@ -317,6 +339,30 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return { ok: r.status === 200 && r.json.ok, extra: r.status };
   });
   await check("GET on the booking endpoint is refused", async () => ({ ok: (await fetch(`${BASE}/api/reserve`)).status === 405 }));
+  const valid = { name: "Quer Seite", phone: "0171 6666666", date: "2026-10-09", time: "19:00", guests: "2" };
+  await check("Cross-site booking requests are refused, even with the session cookie", async () => {
+    const r = await page.request.post(`${BASE}/api/reserve`, {
+      headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
+      data: JSON.stringify(valid),
+    });
+    const site = await page.request.post(`${BASE}/api/reserve`, {
+      headers: { "Content-Type": "application/json", "Sec-Fetch-Site": "cross-site" },
+      data: JSON.stringify(valid),
+    });
+    return { ok: r.status() === 403 && site.status() === 403, extra: `${r.status()}/${site.status()}` };
+  });
+  await check("Booking endpoint only takes JSON", async () => {
+    const r = await page.request.post(`${BASE}/api/reserve`, { form: valid });
+    return { ok: r.status() === 415, extra: r.status() };
+  });
+  await check("A JSON null or array body gets 400, not a server error", async () => {
+    const [nul, arr] = [await api(null, "null"), await api(null, "[1,2]")];
+    return { ok: nul.status === 400 && arr.status === 400, extra: `${nul.status}/${arr.status}` };
+  });
+  await check("Impossible times and dates get 422, not a server error", async () => {
+    const r = await api({ ...valid, date: "2026-02-31", time: "25:99" });
+    return { ok: r.status === 422 && r.json?.errors?.date && r.json?.errors?.time, extra: JSON.stringify(r.json?.errors) };
+  });
 
   /* ================= PROFILE ================= */
   section = "Profile";
@@ -875,8 +921,59 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     return (await own.getByRole("button", { name: /herabstufen|Deaktivieren/ }).count()) === 0;
   });
 
+  await check("'Überall abmelden' ends the other account's sessions", async () => {
+    await staffLogin("neues-passwort-2");
+    await admin.goto(`${BASE}/admin/users`);
+    await staffPanel().getByRole("button", { name: "Überall abmelden" }).click();
+    await admin.waitForURL(/notice=signed-out/, { timeout: 15000 });
+    await staff.goto(`${BASE}/profile`);
+    return { ok: new URL(staff.url()).pathname === "/login", extra: staff.url() };
+  });
+  await check("Tampered ids are ignored instead of failing", async () => {
+    await admin.goto(`${BASE}/admin/users`);
+    await staffPanel().locator('form:has(input[name="active"]) input[name="id"]').evaluate((el) => ((el as HTMLInputElement).value = "not-a-uuid"));
+    await staffPanel().getByRole("button", { name: "Deaktivieren" }).click();
+    await admin.waitForURL(/notice=missing/, { timeout: 15000 });
+    return true;
+  });
+
+  /* ================= ADMIN: SAFE CONTENT ================= */
+  section = "Admin: content checks";
+  await check("Map link must be https to a map service", async () => {
+    await admin.goto(`${BASE}/admin/venue`);
+    const field = admin.locator('input[name="maps_url"]');
+    const original = await field.inputValue();
+    await field.evaluate((el) => ((el as HTMLInputElement).type = "text"));
+    await field.fill("javascript:alert(1)");
+    await admin.getByRole("button", { name: "Speichern" }).click();
+    await admin.waitForURL(/notice=maps/, { timeout: 15000 });
+    await admin.goto(`${BASE}/admin/venue`);
+    const kept = await admin.locator('input[name="maps_url"]').inputValue();
+    return { ok: kept === original && !kept.startsWith("javascript:"), extra: kept };
+  });
+  await check("Reservations export as CSV with the current filters, formulas defused", async () => {
+    const r = await admin.request.get(`${BASE}/admin/reservations/export?when=all`);
+    const body = await r.text();
+    const anon = await fetch(`${BASE}/admin/reservations/export`);
+    const ok = r.status() === 200 && (r.headers()["content-type"] ?? "").includes("text/csv") && body.includes("Datum;Uhrzeit") &&
+      !/;"=/.test(body) && anon.status === 403;
+    return { ok, extra: `${r.status()} ${body.split("\r\n").length - 2} rows, anon ${anon.status}` };
+  });
+  await check("Reservations list has date filters and a total", async () => {
+    await admin.goto(`${BASE}/admin/reservations?when=all&from=2026-10-01&to=2026-10-31`);
+    const header = await admin.locator("main header").innerText();
+    return { ok: /\d+ Treffer/.test(header) && (await admin.locator('input[name="from"]').inputValue()) === "2026-10-01", extra: header };
+  });
+
   /* ================= ADMIN: ACTIVITY ================= */
   section = "Admin: activity log";
+  await check("Sign-ins have their own tab and stay out of the change list", async () => {
+    await admin.goto(`${BASE}/admin/activity?area=signin`);
+    const signins = await admin.locator("main ul").innerText();
+    await admin.goto(`${BASE}/admin/activity`);
+    const changes = await admin.locator("main ul").innerText();
+    return { ok: signins.includes("Angemeldet") && !changes.includes("Angemeldet"), extra: "split" };
+  });
   await check("Every kind of change is logged", async () => {
     await admin.goto(`${BASE}/admin/activity`);
     const t = await admin.locator("main ul").innerText();
