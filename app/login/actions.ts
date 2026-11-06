@@ -14,7 +14,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
-import { isLoginBlocked, recordLoginFailure } from "@/lib/login-throttle";
+import { clearLoginFailures, isLoginBlocked, recordLoginFailure } from "@/lib/login-throttle";
 import { requestIpKey } from "@/lib/security";
 
 export type LoginError = "credentials" | "emailInUse" | "email" | "password" | "tooMany" | "unavailable";
@@ -89,8 +89,8 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
     await logActivity({ id: user.id, email }, "user.signin", "user", user.id, "Passwort");
   }
 
-  // Only this address's count is cleared; the IP count runs out on its own.
-  await sql`delete from login_attempts where email = ${email}`;
+  // Only this address's failures from this IP are cleared; other IPs and the IP count run out on their own.
+  await clearLoginFailures(email, ip);
   await sql`update users set last_login_at = now() where id = ${user.id}`;
   await createSession(user.id);
   redirect(destination(user.role, next));
