@@ -14,13 +14,14 @@ export const RETENTION = {
 
 export async function purgeExpiredData() {
   const sql = db();
-  const [reservations, activity, attempts, sessions] = (await sql.transaction([
+  const [reservations, activity, attempts, sessions, rateEvents] = (await sql.transaction([
     sql`delete from reservations
         where date < (now() at time zone 'Europe/Berlin')::date - make_interval(months => ${RETENTION.reservationMonths})
         returning id`,
     sql`delete from activity_log where at < now() - make_interval(months => ${RETENTION.activityMonths}) returning id`,
     sql`delete from login_attempts where attempted_at < now() - make_interval(hours => ${RETENTION.loginAttemptHours}) returning id`,
     sql`delete from sessions where expires_at < now() returning token_hash`,
+    sql`delete from rate_events where at < now() - make_interval(hours => ${RETENTION.loginAttemptHours}) returning id`,
   ])) as unknown[][];
 
   const counts = {
@@ -28,6 +29,7 @@ export async function purgeExpiredData() {
     activity: activity.length,
     loginAttempts: attempts.length,
     sessions: sessions.length,
+    rateEvents: rateEvents.length,
   };
   if (counts.reservations || counts.activity) {
     await logActivity(null, "retention.cleanup", "", "", `${counts.reservations} Reservierungen, ${counts.activity} Protokolleinträge`);

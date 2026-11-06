@@ -147,3 +147,19 @@ create table if not exists gallery_photos (
   width text not null default 'md:w-[30vw]',
   visible boolean not null default true
 );
+
+-- Throttling by IP address (stored only as a keyed hash) next to the per-email count.
+alter table login_attempts add column if not exists ip_key text not null default '';
+create index if not exists login_attempts_ip_idx on login_attempts (ip_key, attempted_at);
+
+-- Request counters for rate limits (bookings per account and per IP). Kept for a day.
+create table if not exists rate_events (
+  id bigserial primary key,
+  bucket text not null,
+  key text not null,
+  at timestamptz not null default now()
+);
+create index if not exists rate_events_lookup_idx on rate_events (bucket, key, at);
+
+-- Filters on the admin activity page.
+create index if not exists activity_log_action_idx on activity_log (action, at desc);
