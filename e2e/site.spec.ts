@@ -483,6 +483,21 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
       p.get("scope") === "openid email profile" && p.get("state") && cookie.includes("google_oauth") && cookie.toLowerCase().includes("httponly");
     return { ok, extra: `${r.status()} ${target.host}` };
   });
+  await check("Login ?next= refuses tab, newline and backslash tricks that leave the site", async () => {
+    // Each decodes to something a browser turns into //evil.example.
+    const attacks = ["/%09/evil.example", "/%0A/evil.example", "/%0D/evil.example", "/%5Cevil.example", "/%5C%5Cevil.example", "//evil.example", "/%20/evil.example"];
+    const kept: string[] = [];
+    for (const attack of attacks) {
+      await anon.goto(`${BASE}/login?next=${attack}`);
+      const value = await anon.locator('input[name="next"]').first().getAttribute("value");
+      const link = anon.getByRole("link", { name: "Mit Google anmelden" });
+      const google = (await link.count()) ? ((await link.getAttribute("href")) ?? "") : "";
+      if (value || google.includes("next=")) kept.push(attack);
+    }
+    await anon.goto(`${BASE}/login?next=%2Fprofile`);
+    const safe = await anon.locator('input[name="next"]').first().getAttribute("value");
+    return { ok: kept.length === 0 && safe === "/profile", extra: kept.length ? `kept ${kept.join(" ")}` : `safe=${safe}` };
+  });
   await check("Google callback with a forged state is rejected", async () => {
     await anon.goto(`${BASE}/api/auth/google/callback?code=fake&state=forged`);
     return { ok: anon.url().includes("/login?error=google") && (await anon.getByText("Die Anmeldung mit Google hat nicht geklappt.").count()) === 1, extra: anon.url() };

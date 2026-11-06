@@ -104,10 +104,23 @@ export async function revokeOtherSessions(userId: string) {
   await db()`delete from sessions where user_id = ${userId} and token_hash <> ${hashToken(token)}`;
 }
 
-/* Only paths on this site, so a crafted link cannot send someone elsewhere after login. */
+/*
+  Only paths on this site, so a crafted link cannot send someone elsewhere after
+  login. Browsers drop tabs and newlines from URLs and read "\" as "/", so
+  "/\t/evil.com" or "/\evil.com" would become "//evil.com": any control
+  character, whitespace or backslash is refused outright, and the result must
+  still resolve to this origin.
+*/
+// eslint-disable-next-line no-control-regex
+const UNSAFE_IN_PATH = /[\x00-\x20\x7f\\]/;
 export function safeNext(value: unknown) {
   const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "";
+  if (!next.startsWith("/") || next.startsWith("//") || UNSAFE_IN_PATH.test(next)) return "";
+  try {
+    return new URL(next, "http://x").origin === "http://x" ? next : "";
+  } catch {
+    return "";
+  }
 }
 
 /* Any signed-in account: the profile page and its actions. */
