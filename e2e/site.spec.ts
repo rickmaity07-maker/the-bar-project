@@ -11,6 +11,8 @@ import { waitForMail, type ReceivedMail } from "./inbox";
 */
 const state: SuiteState = JSON.parse(readFileSync(STATE_FILE, "utf8"));
 const BASE = "http://localhost:3010";
+/* lib/auth.ts: production builds (which the suite runs) use the __Host- prefix. */
+const SESSION_COOKIE = "__Host-session";
 const OWNER = state.owner.email;
 const OWNER_PW = state.owner.password;
 const TAG = `[TEST ${state.run}]`;
@@ -427,16 +429,18 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     }
     return { ok: bad.length === 0, extra: bad.join(",") };
   });
-  await check("Session cookie is httpOnly and SameSite=Lax", async () => {
-    const c = (await guestCtx.cookies()).find((x) => x.name === "session");
-    return { ok: c && c.httpOnly && c.sameSite === "Lax", extra: c ? `httpOnly=${c.httpOnly} sameSite=${c.sameSite}` : "no cookie" };
+  await check("Session cookie is __Host-session: httpOnly, Secure, SameSite=Lax, Path=/, no Domain", async () => {
+    // The suite runs a production build (next start), which uses the __Host- prefix.
+    const c = (await guestCtx.cookies()).find((x) => x.name === SESSION_COOKIE);
+    const ok = c && c.httpOnly && c.secure && c.sameSite === "Lax" && c.path === "/" && !c.domain.startsWith(".");
+    return { ok, extra: c ? `httpOnly=${c.httpOnly} secure=${c.secure} sameSite=${c.sameSite} path=${c.path} domain=${c.domain}` : "no cookie" };
   });
   await check("Sign out goes to the homepage and ends the session", async () => {
     await page.goto(`${BASE}/profile`);
     await page.getByRole("button", { name: "Abmelden" }).click();
     await page.waitForURL(`${BASE}/`, { timeout: 15000 });
     await settle(page, 1200);
-    return { ok: !(await guestCtx.cookies()).some((x) => x.name === "session") && (await navText(page)).includes("ANMELDEN") };
+    return { ok: !(await guestCtx.cookies()).some((x) => x.name === SESSION_COOKIE) && (await navText(page)).includes("ANMELDEN") };
   });
   await check("Sign-up with an existing email is refused", async () => {
     await page.goto(`${BASE}/login?mode=signup`);
@@ -1075,7 +1079,7 @@ test("Bar-05: the whole site, end to end", async ({ browser }) => {
     await page.locator('input[name="confirm"]').fill(GUEST);
     await page.getByRole("button", { name: "Konto endgültig löschen" }).click();
     await page.waitForURL(/konto=geloescht/, { timeout: 20_000 });
-    const signedOut = !(await guestCtx.cookies()).some((c) => c.name === "session");
+    const signedOut = !(await guestCtx.cookies()).some((c) => c.name === SESSION_COOKIE);
     await admin.goto(`${BASE}/admin/reservations?when=all&q=${encodeURIComponent(TAG)}`);
     const left = await admin.locator("article").count();
     await admin.goto(`${BASE}/admin/users`);

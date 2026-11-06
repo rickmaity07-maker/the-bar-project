@@ -166,7 +166,7 @@ export default async function PrivacyPage() {
         <table className="w-full text-left text-sm">
           <tbody>
             <tr>
-              <td className={`${ROW} text-mist`}>session</td>
+              <td className={`${ROW} text-mist`}>__Host-session</td>
               <td className={ROW}>hält euch nach der Anmeldung angemeldet; höchstens fünf Tage</td>
             </tr>
             <tr>

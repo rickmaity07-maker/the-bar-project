@@ -18,8 +18,16 @@ const scryptAsync = promisify(scrypt) as (
   options: ScryptParams & { maxmem: number },
 ) => Promise<Buffer>;
 
-export const SESSION_COOKIE = "session";
+/*
+  In production the cookie is "__Host-session": browsers only accept that name
+  with Secure, Path=/ and no Domain, so a sibling subdomain or a plain-HTTP
+  response cannot plant or overwrite it (session fixation). Local development
+  over http://localhost keeps the plain name.
+*/
+const PRODUCTION = process.env.NODE_ENV === "production";
+export const SESSION_COOKIE = PRODUCTION ? "__Host-session" : "session";
 const SESSION_MAX_AGE_S = 60 * 60 * 24 * 5;
+const SESSION_COOKIE_OPTIONS = { httpOnly: true, secure: PRODUCTION, sameSite: "lax", path: "/" } as const;
 
 export type Role = "user" | "owner";
 
@@ -126,20 +134,15 @@ export async function createSession(userId: string) {
     values (${hashToken(token)}, ${userId}, now() + make_interval(secs => ${SESSION_MAX_AGE_S}))
   `;
   await sql`delete from sessions where expires_at < now()`;
-  (await cookies()).set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_MAX_AGE_S,
-    path: "/",
-  });
+  (await cookies()).set(SESSION_COOKIE, token, { ...SESSION_COOKIE_OPTIONS, maxAge: SESSION_MAX_AGE_S });
 }
 
 export async function destroySession() {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (token && hasDatabase()) await db()`delete from sessions where token_hash = ${hashToken(token)}`;
-  store.delete(SESSION_COOKIE);
+  // Expired with the same attributes: a __Host- cookie is only replaced by one that is Secure with Path=/.
+  store.set(SESSION_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
 }
 
 /* The role is read from the database on every request, so a demotion or deactivation applies at once. */

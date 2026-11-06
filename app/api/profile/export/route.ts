@@ -28,7 +28,8 @@ export async function GET() {
       reservations,
       activity,
       active_sessions: sessions,
-      sessions_and_cookies: "A session cookie keeps you signed in for up to five days; only a hash of it is stored.",
+      sessions_and_cookies:
+        "A session cookie (__Host-session) keeps you signed in for up to five days; only a hash of it is stored.",
     },
     null,
     2,
