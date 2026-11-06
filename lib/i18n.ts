@@ -341,6 +341,8 @@ const de = {
       tooMany: "Zu viele Versuche. Bitte in 15 Minuten noch einmal probieren.",
       unavailable: "Die Anmeldung ist gerade nicht verfügbar.",
       google: "Die Anmeldung mit Google hat nicht geklappt. Bitte noch einmal versuchen.",
+      googleLink:
+        "Für diese E-Mail gibt es schon ein Konto, das nicht mit Google verknüpft ist. Meldet euch mit dem Passwort an und verknüpft Google im Profil.",
     },
   },
   profile: {
@@ -392,6 +394,18 @@ const de = {
       lastOwner: "Das einzige Inhaber-Konto kann nicht gelöscht werden. Macht vorher ein anderes Konto zum Inhaber.",
     },
     privacy: "Datenschutzerklärung",
+    googleTitle: "Google-Anmeldung",
+    googleLinked: "Euer Konto ist mit Google verknüpft. Ihr könnt euch mit Google anmelden.",
+    googleNotLinked: "Verknüpft euer Konto mit Google, dann könnt ihr euch auch ohne Passwort anmelden.",
+    googleLink: "Mit Google verknüpfen",
+    googleUnlink: "Verknüpfung lösen",
+    googleUnlinkConfirm: "Die Verknüpfung mit Google lösen?",
+    googleNeedsPassword: "Legt erst ein Passwort fest, bevor ihr die Verknüpfung löst, sonst könnt ihr euch nicht mehr anmelden.",
+    googleNotice: {
+      linked: "Google ist jetzt mit eurem Konto verknüpft.",
+      taken: "Dieses Google-Konto ist schon mit einem anderen Konto verknüpft.",
+      unlinked: "Die Verknüpfung mit Google ist gelöst.",
+    },
   },
   gauge: { zones: ["Lichtzone", "Dämmerzone", "Mitternachtszone"] },
 };
@@ -730,6 +744,8 @@ const en: Dict = {
       tooMany: "Too many attempts. Please try again in 15 minutes.",
       unavailable: "Sign-in is not available right now.",
       google: "Signing in with Google did not work. Please try again.",
+      googleLink:
+        "There is already an account for this email that is not linked to Google. Sign in with your password and link Google on your profile.",
     },
   },
   profile: {
@@ -781,6 +797,18 @@ const en: Dict = {
       lastOwner: "The only owner account cannot be deleted. Make another account owner first.",
     },
     privacy: "Privacy policy",
+    googleTitle: "Google sign-in",
+    googleLinked: "Your account is linked to Google. You can sign in with Google.",
+    googleNotLinked: "Link your account to Google to sign in without a password.",
+    googleLink: "Link Google",
+    googleUnlink: "Unlink",
+    googleUnlinkConfirm: "Unlink Google from this account?",
+    googleNeedsPassword: "Set a password before you unlink Google, otherwise you can no longer sign in.",
+    googleNotice: {
+      linked: "Google is now linked to your account.",
+      taken: "This Google account is already linked to another account.",
+      unlinked: "Google has been unlinked.",
+    },
   },
   gauge: { zones: ["Sunlight zone", "Twilight zone", "Midnight zone"] },
 };

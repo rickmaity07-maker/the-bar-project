@@ -4,9 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { logActivity } from "@/lib/activity";
-import { destroySession, hashPassword, requireUser, revokeOtherSessions, verifyPassword } from "@/lib/auth";
+import {
+  destroySession,
+  hashPassword,
+  MAX_PASSWORD_LENGTH,
+  requireUser,
+  revokeOtherSessions,
+  verifyPassword,
+} from "@/lib/auth";
 import { db } from "@/lib/db";
 import { notifyCancellation } from "@/lib/mailer";
+import { isUuid } from "@/lib/security";
 
 export type ProfileError = "name" | "phone" | "wrongPassword" | "password";
 export interface ProfileState {
@@ -38,7 +46,7 @@ export async function changePassword(_previous: ProfileState, form: FormData): P
   if (row.password_hash && !(await verifyPassword(current, row.password_hash))) {
     return { error: "wrongPassword", done: false };
   }
-  if (next.length < 8) return { error: "password", done: false };
+  if (next.length < 8 || next.length > MAX_PASSWORD_LENGTH) return { error: "password", done: false };
 
   await sql`update users set password_hash = ${await hashPassword(next)} where id = ${me.id}`;
   await revokeOtherSessions(me.id);
@@ -50,6 +58,7 @@ export async function changePassword(_previous: ProfileState, form: FormData): P
 export async function cancelMyReservation(form: FormData) {
   const me = await requireUser();
   const id = String(form.get("id") ?? "");
+  if (!isUuid(id)) return;
   const rows = (await db()`
     update reservations set status = 'cancelled', updated_at = now(), updated_by = ${me.id}
     where id = ${id} and user_id = ${me.id} and status in ('pending', 'confirmed')
@@ -62,6 +71,19 @@ export async function cancelMyReservation(form: FormData) {
   after(() => notifyCancellation(rows[0], me.email));
   revalidatePath("/profile");
   revalidatePath("/admin", "layout");
+}
+
+/* Google can only be unlinked while a password is set, so the account never ends up without a way in. */
+export async function unlinkGoogle() {
+  const me = await requireUser();
+  const rows = (await db()`
+    update users set google_sub = null
+    where id = ${me.id} and google_sub is not null and password_hash <> ''
+    returning id
+  `) as { id: string }[];
+  if (rows[0]) await logActivity(me, "user.google_unlink", "user", me.id, me.email);
+  revalidatePath("/profile");
+  redirect(rows[0] ? "/profile?google=unlinked" : "/profile");
 }
 
 export type DeleteError = "lastOwner" | "confirm";

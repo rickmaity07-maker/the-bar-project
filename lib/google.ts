@@ -56,7 +56,9 @@ export async function finishGoogleLogin(origin: string, code: string, verifier: 
     }),
   });
   if (!tokenResponse.ok) {
-    console.error("Google token exchange failed:", tokenResponse.status, await tokenResponse.text());
+    // Only Google's short error code: the body can echo request details, which do not belong in logs.
+    const { error } = (await tokenResponse.json().catch(() => ({}))) as { error?: unknown };
+    console.error("Google token exchange failed:", tokenResponse.status, typeof error === "string" ? error.slice(0, 60) : "");
     return null;
   }
   const { access_token: accessToken } = (await tokenResponse.json()) as { access_token?: string };

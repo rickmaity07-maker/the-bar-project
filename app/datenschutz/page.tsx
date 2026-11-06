@@ -84,14 +84,18 @@ export default async function PrivacyPage() {
           Google-Anmeldung) können wir kein Konto anlegen.
         </p>
         <p>
-          Zum Schutz vor dem Erraten von Passwörtern zählen wir fehlgeschlagene Anmeldeversuche je E-Mail-Adresse
-          und sperren nach acht Fehlversuchen für 15 Minuten (Art. 6 Abs. 1 lit. f DSGVO).
+          Zum Schutz vor dem Erraten von Passwörtern und vor massenhaften Fake-Reservierungen zählen wir
+          fehlgeschlagene Anmeldeversuche je E-Mail-Adresse und je IP-Adresse sowie Reservierungsanfragen je Konto
+          und je IP-Adresse. Die IP-Adresse speichern wir dabei nur als verschlüsselten Prüfwert (HMAC), nicht im
+          Klartext. Nach acht Fehlversuchen für eine E-Mail-Adresse oder 30 von einer IP-Adresse sperren wir die
+          Anmeldung für 15 Minuten (Art. 6 Abs. 1 lit. f DSGVO).
         </p>
         <p>
           <strong className="text-foam">Anmeldung mit Google:</strong> Wenn ihr „Mit Google anmelden“ wählt, leitet
           euch die Seite zu Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland, weiter. Nach eurer
           Zustimmung bei Google erhalten wir eure E-Mail-Adresse, euren Namen und eine Google-Kennung, euer
-          Google-Passwort nie. Ist die E-Mail-Adresse schon bei uns registriert, wird das bestehende Konto verknüpft.
+          Google-Passwort nie. Ist die E-Mail-Adresse schon als Gastkonto registriert, wird es mit Google verknüpft
+          und sein bisheriges Passwort entfernt; Inhaber-Konten verknüpfen Google nur selbst im Profil.
           Für die Verarbeitung bei Google gilt dessen Datenschutzerklärung (policies.google.com/privacy).
         </p>
       </Section>
@@ -138,7 +142,7 @@ export default async function PrivacyPage() {
               <td className={ROW}>{RETENTION.activityMonths} Monate, dann automatisch gelöscht</td>
             </tr>
             <tr>
-              <td className={`${ROW} text-mist`}>Fehlgeschlagene Anmeldeversuche</td>
+              <td className={`${ROW} text-mist`}>Fehlgeschlagene Anmeldeversuche und Zähler gegen Missbrauch</td>
               <td className={ROW}>{RETENTION.loginAttemptHours} Stunden</td>
             </tr>
             <tr>

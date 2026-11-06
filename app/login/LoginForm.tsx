@@ -15,10 +15,11 @@ interface Props {
   initialMode: "signin" | "signup";
   /* Shown only when the Google OAuth keys are configured. */
   google: boolean;
-  googleFailed: boolean;
+  /* Set when the Google flow sent the visitor back with an error. */
+  googleError: "google" | "googleLink" | "tooMany" | null;
 }
 
-export default function LoginForm({ next, initialMode, google, googleFailed }: Props) {
+export default function LoginForm({ next, initialMode, google, googleError }: Props) {
   const { t } = useLanguage();
   const copy = t.login;
   const [mode, setMode] = useState(initialMode);
@@ -67,9 +68,9 @@ export default function LoginForm({ next, initialMode, google, googleFailed }: P
           </div>
         </>
       )}
-      {googleFailed && (
+      {googleError && (
         <p role="alert" className="mt-6 text-sm text-buoy">
-          {copy.errors.google}
+          {copy.errors[googleError]}
         </p>
       )}
 

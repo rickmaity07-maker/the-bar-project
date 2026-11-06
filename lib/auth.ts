@@ -28,12 +28,32 @@ export async function hashPassword(password: string) {
   return `scrypt$${salt}$${hash.toString("hex")}`;
 }
 
+/* Longer input only costs scrypt time; nobody types more than this. */
+export const MAX_PASSWORD_LENGTH = 256;
+
+const HASH_FORMAT = /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$/;
+
+/*
+  Never throws and never accepts a malformed stored value: an odd or empty hex
+  string would otherwise decode to a short (even empty) buffer that a derived
+  key of the same length matches.
+*/
 export async function verifyPassword(password: string, stored: string) {
-  const [scheme, salt, hash] = stored.split("$");
-  if (scheme !== "scrypt" || !salt || !hash) return false;
-  const expected = Buffer.from(hash, "hex");
-  const actual = await scryptAsync(password, salt, expected.length);
-  return timingSafeEqual(actual, expected);
+  if (!HASH_FORMAT.test(stored) || password.length > MAX_PASSWORD_LENGTH) return false;
+  const [, salt, hash] = stored.split("$");
+  try {
+    const expected = Buffer.from(hash, "hex");
+    const actual = await scryptAsync(password, salt, expected.length);
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+/* Spent on unknown emails too, so the response time does not reveal which addresses have an account. */
+const DUMMY_HASH = `scrypt$${"0".repeat(32)}$${"0".repeat(128)}`;
+export async function burnPasswordCheck(password: string) {
+  await verifyPassword(password.slice(0, MAX_PASSWORD_LENGTH), DUMMY_HASH);
 }
 
 /* Only a hash of the token is stored, so a leaked sessions table cannot be replayed. */
@@ -65,9 +85,10 @@ export async function destroySession() {
 
 /* The role is read from the database on every request, so a demotion or deactivation applies at once. */
 export const getSession = cache(async (): Promise<SessionUser | null> => {
-  if (!hasDatabase()) return null;
+  // Cookies first: every page that asks who is signed in renders per request (and gets its CSP nonce),
+  // even in a build without a database.
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token || !hasDatabase()) return null;
   const rows = await db()`
     select u.id, u.email, u.name, u.phone, u.role
     from sessions s

@@ -2,8 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity";
-import { createSession, destroySession, getSession, hashPassword, safeNext, verifyPassword } from "@/lib/auth";
+import {
+  burnPasswordCheck,
+  createSession,
+  destroySession,
+  getSession,
+  hashPassword,
+  MAX_PASSWORD_LENGTH,
+  safeNext,
+  verifyPassword,
+} from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
+import { isLoginBlocked, recordLoginFailure } from "@/lib/login-throttle";
+import { requestIpKey } from "@/lib/security";
 
 export type LoginError = "credentials" | "emailInUse" | "email" | "password" | "tooMany" | "unavailable";
 export interface LoginState {
@@ -12,8 +23,7 @@ export interface LoginState {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_FAILURES = 8;
-const WINDOW = "15 minutes";
+const MAX_EMAIL_LENGTH = 200;
 
 interface UserRow {
   id: string;
@@ -34,20 +44,17 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
   const name = String(form.get("name") ?? "").trim().slice(0, 120);
   const next = safeNext(form.get("next"));
 
-  if (!hasDatabase()) return { error: "unavailable", email };
-  if (!EMAIL.test(email)) return { error: "email", email };
+  if (!hasDatabase()) return { error: "unavailable", email: "" };
+  if (email.length > MAX_EMAIL_LENGTH || !EMAIL.test(email)) return { error: "email", email: "" };
+
+  const ip = await requestIpKey();
+  if (await isLoginBlocked(email, ip)) return { error: "tooMany", email };
 
   const sql = db();
-  const [{ failures }] = (await sql`
-    select count(*)::int as failures from login_attempts
-    where email = ${email} and attempted_at > now() - ${WINDOW}::interval
-  `) as { failures: number }[];
-  if (failures >= MAX_FAILURES) return { error: "tooMany", email };
-
   let user: UserRow | undefined;
 
   if (mode === "signup") {
-    if (password.length < 8) return { error: "password", email };
+    if (password.length < 8 || password.length > MAX_PASSWORD_LENGTH) return { error: "password", email };
     const created = (await sql`
       insert into users (email, name, password_hash)
       values (${email}, ${name}, ${await hashPassword(password)})
@@ -55,21 +62,29 @@ export async function authenticate(_previous: LoginState, form: FormData): Promi
       returning id, email, password_hash, role, active
     `) as UserRow[];
     user = created[0];
-    if (!user) return { error: "emailInUse", email };
+    if (!user) {
+      // Counted like a failure, so the sign-up form cannot be used to list registered addresses quickly.
+      await recordLoginFailure("", ip);
+      return { error: "emailInUse", email };
+    }
     await logActivity({ id: user.id, email }, "user.signup", "user", user.id);
   } else {
     const rows = (await sql`
       select id, email, password_hash, role, active from users where email = ${email}
     `) as UserRow[];
     const candidate = rows[0];
-    const valid = candidate ? await verifyPassword(password, candidate.password_hash) : false;
+    let valid = false;
+    if (candidate) valid = await verifyPassword(password, candidate.password_hash);
+    else await burnPasswordCheck(password);
     if (!candidate || !valid || !candidate.active) {
-      await sql`insert into login_attempts (email) values (${email})`;
+      await recordLoginFailure(email, ip);
       return { error: "credentials", email };
     }
     user = candidate;
+    await logActivity({ id: user.id, email }, "user.signin", "user", user.id, "Passwort");
   }
 
+  // Only this address's count is cleared; the IP count runs out on its own.
   await sql`delete from login_attempts where email = ${email}`;
   await sql`update users set last_login_at = now() where id = ${user.id}`;
   await createSession(user.id);

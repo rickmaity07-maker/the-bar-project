@@ -6,7 +6,16 @@ import { useFormStatus } from "react-dom";
 import type { SessionUser } from "@/lib/auth";
 import { useLanguage } from "@/lib/language";
 import { signOut } from "../login/actions";
-import { cancelMyReservation, changePassword, deleteMyAccount, updateProfile, type ProfileState } from "./actions";
+import {
+  cancelMyReservation,
+  changePassword,
+  deleteMyAccount,
+  unlinkGoogle,
+  updateProfile,
+  type ProfileState,
+} from "./actions";
+
+export type GoogleNotice = "linked" | "taken" | "unlinked";
 
 export interface MyReservation {
   id: string;
@@ -53,9 +62,10 @@ interface Props {
   me: SessionUser;
   reservations: MyReservation[];
   hasPassword: boolean;
+  google: { available: boolean; linked: boolean; notice: GoogleNotice | null };
 }
 
-export default function ProfileView({ me, reservations, hasPassword }: Props) {
+export default function ProfileView({ me, reservations, hasPassword, google }: Props) {
   const { t, locale } = useLanguage();
   const copy = t.profile;
   const [details, saveDetails] = useActionState(updateProfile, INITIAL);
@@ -203,6 +213,42 @@ export default function ProfileView({ me, reservations, hasPassword }: Props) {
               </form>
             </div>
           </section>
+
+          {(google.available || google.linked) && (
+            <section className={CARD}>
+              <div className={CORE}>
+                <h2 className="display text-3xl text-foam">{copy.googleTitle}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-mist">
+                  {google.linked ? copy.googleLinked : copy.googleNotLinked}
+                </p>
+                {google.notice && (
+                  <p role="status" className={`mt-4 text-sm ${google.notice === "taken" ? "text-buoy" : "text-[#4fb39a]"}`}>
+                    {copy.googleNotice[google.notice]}
+                  </p>
+                )}
+                <div className="mt-6">
+                  {google.linked ? (
+                    hasPassword ? (
+                      <form action={unlinkGoogle}>
+                        <Button variant="ghost" confirm={copy.googleUnlinkConfirm}>
+                          {copy.googleUnlink}
+                        </Button>
+                      </form>
+                    ) : (
+                      <p className="text-sm text-mist">{copy.googleNeedsPassword}</p>
+                    )
+                  ) : (
+                    <a
+                      href="/api/auth/google?link=1"
+                      className="label inline-block rounded-full px-6 py-3.5 text-foam ring-1 ring-inset ring-foam/25 transition-colors duration-500 ease-drift hover:bg-foam hover:text-abyss"
+                    >
+                      {copy.googleLink}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </div>
 

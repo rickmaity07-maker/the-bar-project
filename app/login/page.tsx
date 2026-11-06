@@ -30,7 +30,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Params
             next={next}
             initialMode={params.mode === "signup" ? "signup" : "signin"}
             google={isGoogleConfigured()}
-            googleFailed={params.error === "google"}
+            googleError={
+              params.error === "google" || params.error === "googleLink" || params.error === "tooMany" ? params.error : null
+            }
           />
         </div>
       </div>
