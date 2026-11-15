@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, finish-backend]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # npm install, as Vercel does: a lockfile written on Windows can lack Linux-only optional entries.
+      - run: npm install --no-audit --no-fund
+      # Fails on any high or critical advisory in what ships to production.
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # No DATABASE_URL: the public site builds from its built-in defaults.
+      - run: npm run build

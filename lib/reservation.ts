@@ -60,8 +60,17 @@ function isCalendarDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+/*
+  Today's date in Schweinfurt. The server runs in UTC, so between midnight and
+  1 or 2 a.m. German time its own "today" is still yesterday, which would let a
+  guest book a day that has already passed.
+*/
+export function berlinToday(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
 /* Shared by the form and the API route so both agree on what a valid request is. */
-export function validateReservation(input: ReservationInput, schedule: Schedule): ReservationErrors {
+export function validateReservation(input: ReservationInput, schedule: Schedule, now = new Date()): ReservationErrors {
   const errors: ReservationErrors = {};
 
   if (input.name.trim().length < 2 || input.name.length > MAX_NAME_LENGTH) errors.name = "name";
@@ -71,13 +80,11 @@ export function validateReservation(input: ReservationInput, schedule: Schedule)
   if (!isCalendarDate(input.date)) {
     errors.date = "date";
   } else {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const day = new Date(`${input.date}T00:00:00`);
-    const latest = new Date(today);
-    latest.setFullYear(latest.getFullYear() + 2);
-    if (day < today) errors.date = "datePast";
-    else if (day > latest) errors.date = "date";
+    const today = berlinToday(now);
+    const latest = `${Number(today.slice(0, 4)) + 2}${today.slice(4)}`;
+    // ISO dates compare correctly as strings.
+    if (input.date < today) errors.date = "datePast";
+    else if (input.date > latest) errors.date = "date";
     else if (isClosedOn(input.date, schedule.week, schedule.closedDates)) errors.date = "closed";
   }
 

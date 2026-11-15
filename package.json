@@ -10,7 +10,10 @@
     "db:setup": "node --env-file-if-exists=.env.local scripts/setup-db.mjs",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
-    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed-content.mts"
+    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed-content.mts",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "audit": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -29,7 +32,7 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -37,6 +40,7 @@
     "imapflow": "^2.2.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.1.0"
   }
 }
